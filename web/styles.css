@@ -17,11 +17,6 @@ body.onesheet #stage{
   display:grid; place-items:center;
   padding: min(5vh, 40px);
 }
-/* Hide mouse cursor on the kiosk (one-sheet) view */
-body.onesheet, 
-body.onesheet * { 
-  cursor: none !important; 
-}
 #poster{
   max-height: 88vh;
   max-width: 82vw;
