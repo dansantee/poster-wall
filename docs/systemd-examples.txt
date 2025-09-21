@@ -1,0 +1,44 @@
+# /etc/systemd/system/poster-proxy.service
+[Unit]
+Description=Poster Wall Proxy
+After=network-online.target
+
+[Service]
+WorkingDirectory=/home/pi/poster-wall/proxy
+Environment=PLEX_URL=http://192.168.1.10:32400
+Environment=PLEX_TOKEN=xxxxxxxxxxxxxxxxx
+Environment=SECTION_ID=1
+ExecStart=/home/pi/poster-wall/proxy/.venv/bin/python /home/pi/poster-wall/proxy/app.py
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/poster-web.service
+[Unit]
+Description=Poster Wall (static web)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/home/pi/poster-wall/web
+ExecStart=/usr/bin/python3 -m http.server 8088
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/poster-kiosk.service
+[Unit]
+Description=Chromium Kiosk for Poster Wall
+After=graphical.target network-online.target poster-proxy.service poster-web.service
+
+[Service]
+User=pi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStart=/usr/bin/chromium-browser   --kiosk http://localhost:8088/index.html   --incognito   --noerrdialogs   --disable-session-crashed-bubble   --overscroll-history-navigation=0   --check-for-update-interval=31536000   --disable-translate
+Restart=always
+
+[Install]
+WantedBy=graphical.target

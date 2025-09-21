@@ -1,0 +1,67 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings – Poster Wall</title>
+  <link rel="stylesheet" href="styles.css" />
+  </head>
+<body>
+  <header class="topbar">
+    <h1>Settings</h1>
+    <nav>
+      <a href="index.html" class="btn">Back</a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Display Options</h2>
+    <form id="display-form">
+      <label>Section ID (Movies Library)
+        <input type="text" id="sectionId" placeholder="1" />
+      </label>
+      <label>Proxy URL
+        <input type="text" id="proxyUrl" placeholder="http://localhost:8811" />
+      </label>
+      <label>Rotation Seconds
+        <input type="number" id="rotateSec" min="3" max="3600" placeholder="120" />
+      </label>
+      <label class="inline" for="autoDim">
+        <span>Auto-dim bright posters</span>
+        <input type="checkbox" id="autoDim" />
+      </label>
+      <button type="submit" class="btn">Save</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Plex Connection</h2>
+    <form id="plex-form">
+      <label>Plex Server URL
+        <input type="text" id="plexUrl" placeholder="http://192.168.1.10:32400" />
+      </label>
+      <label>Plex Token
+        <input type="password" id="plexToken" placeholder="XXXXXXXXXXXXXXXX" />
+      </label>
+      <label class="inline" for="plexInsecure">
+        <span>Allow Insecure Certificates</span>
+        <input type="checkbox" id="plexInsecure" />
+      </label>
+      <button type="submit" class="btn">Save</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Test</h2>
+    <div class="row">
+      <button id="btnPing" class="btn">Test Proxy</button>
+      <button id="btnTry" class="btn">Test Plex</button>
+    </div>
+    <pre id="testOut" class="pre"></pre>
+  </section>
+
+  <script src="settings.js"></script>
+
+</body>
+</html>

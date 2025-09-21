@@ -1,0 +1,97 @@
+:root{
+  --bg:#000; --text:#e6e9ef; --muted:#97a1ad; --card:#0c0f14; --accent:#7aa2f7;
+  --gap:12px; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#000;color:var(--text);font-family:system-ui,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+
+.topbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:linear-gradient(180deg,rgba(0,0,0,.9),rgba(0,0,0,.3));backdrop-filter:blur(4px);z-index:2}
+.topbar h1{font-size:16px;margin:0;color:#cfd8e3}
+.btn{display:inline-block;background:var(--card);border:1px solid #1b2330;border-radius:10px;color:#dbe4ee;text-decoration:none;padding:8px 12px;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--accent)}
+
+/* One-sheet stage */
+body.onesheet #stage{
+  position:fixed; inset:0;
+  display:grid; place-items:center;
+  padding: min(5vh, 40px);
+}
+#poster{
+  max-height: 88vh;
+  max-width: 82vw;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.7);
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity .5s ease, transform .8s ease;
+}
+#poster.loaded{
+  opacity: 1;
+  transform: scale(1);
+}
+#caption{
+  position: fixed;
+  bottom: 18px; left: 0; right: 0;
+  text-align: center;
+  font-size: clamp(12px, 2.2vw, 18px);
+  color: var(--muted);
+  text-shadow: 0 2px 10px #000;
+}
+
+/* Cards etc (still used on settings page) */
+.card{background:var(--card);border:1px solid #151c27;border-radius:var(--radius);padding:16px;margin:16px;max-width:900px;box-shadow:var(--shadow)}
+.card h2{margin-top:0}
+label{display:block;margin:8px 0}
+input{width:100%;padding:10px;border-radius:10px;border:1px solid #293041;background:#0b0f16;color:#e9eef7}
+.muted{color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.pre{background:#0b0f16;border:1px solid #1a2230;border-radius:10px;padding:10px;overflow:auto;max-height:260px}
+
+.card label.inline {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;   /* keep it from stretching */
+}
+
+.card label.inline input[type="checkbox"] { margin: 0; }
+.card label.inline span { white-space: nowrap; }  /* keep text on one line */
+
+/* One-sheet fullscreen crossfade (two stacked <img>) */
+#stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+.poster {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-height: 100vh;
+  max-width: 100vw;
+  aspect-ratio: 2 / 3;
+  object-fit: contain;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  opacity: 0;
+  transition: opacity 900ms ease;
+  will-change: opacity;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+.poster.visible {
+  opacity: 1;
+}
+
+/* Dim very bright posters (toggled by JS) */
+.poster {
+  transition: opacity 900ms ease, filter 300ms ease;
+}
+.poster.dim {
+  filter: brightness(0.7);
+}
