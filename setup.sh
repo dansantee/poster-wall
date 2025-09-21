@@ -192,25 +192,32 @@ systemctl --user enable poster-proxy.service poster-web.service poster-kiosk.ser
 systemctl --user restart poster-proxy.service poster-web.service poster-kiosk.service
 
 # -------- Boot/file tweaks (safe, idempotent) --------
-# Prevent screen blanking on console and ensure HDMI present; set GPU mem for smoother rendering.
-# NOTE: These edits require a reboot to take effect.
+# Detect boot dir (Bookworm: /boot/firmware; some images: /boot)
 BOOT_FW="/boot/firmware"
+[ -e /boot/cmdline.txt ] && BOOT_FW="/boot"
+
 CMDLINE="$BOOT_FW/cmdline.txt"
 CONFIGTXT="$BOOT_FW/config.txt"
 
-if [[ -w "$CMDLINE" && -w "$CONFIGTXT" ]]; then
+if [[ -e "$CMDLINE" && -e "$CONFIGTXT" ]]; then
   echo "==> Applying boot tweaks (consoleblank=0, gpu_mem=256, hdmi_force_hotplug=1)..."
-  # cmdline.txt is a SINGLE LINE; append consoleblank=0 if missing
+
+  sudo cp "$CMDLINE"   "$CMDLINE.bak.$(date +%s)"
+  sudo cp "$CONFIGTXT" "$CONFIGTXT.bak.$(date +%s)"
+
   if ! grep -qw "consoleblank=0" "$CMDLINE"; then
-    sudo cp "$CMDLINE" "$CMDLINE.bak.$(date +%s)"
     sudo sed -i 's/$/ consoleblank=0/' "$CMDLINE"
   fi
-  # config.txt: add gpu_mem and hdmi_force_hotplug idempotently
-  sudo cp "$CONFIGTXT" "$CONFIGTXT.bak.$(date +%s)"
-  grep -q "^gpu_mem=" "$CONFIGTXT" || echo "gpu_mem=256" | sudo tee -a "$CONFIGTXT" >/dev/null
-  grep -q "^hdmi_force_hotplug=" "$CONFIGTXT" || echo "hdmi_force_hotplug=1" | sudo tee -a "$CONFIGTXT" >/dev/null
+
+  # Replace any existing gpu_mem= line, then append ours
+  sudo sed -i '/^gpu_mem=/d' "$CONFIGTXT"
+  echo "gpu_mem=256" | sudo tee -a "$CONFIGTXT" >/dev/null
+
+  # Add hdmi_force_hotplug=1 if not present
+  grep -q '^hdmi_force_hotplug=' "$CONFIGTXT" || \
+    echo "hdmi_force_hotplug=1" | sudo tee -a "$CONFIGTXT" >/dev/null
 else
-  echo "WARN: Cannot edit $CMDLINE / $CONFIGTXT (are we on Raspberry Pi OS?). Skipping boot tweaks."
+  echo "WARN: couldn't find cmdline.txt/config.txt under /boot or /boot/firmware. Skipping boot tweaks."
 fi
 
 # -------- Finish --------
