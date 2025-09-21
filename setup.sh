@@ -1,233 +1,299 @@
 #!/usr/bin/env bash
-# Poster Wall kiosk installer (Pi 5, Raspberry Pi OS Bookworm)
-# - Cage + Chromium kiosk
-# - Proxy (Flask) + static web server
-# - Transparent cursor theme (hidden by default; toggle with scripts)
-# - Robust Wayland rotation (oneshot + path)
-# - Optional console (fbcon) rotation, resolution-agnostic
+# setup.sh — Poster Wall one-shot installer for Raspberry Pi 5 (Bookworm Lite)
+# - Installs minimal deps (Chromium + cage Wayland compositor, Python venv)
+# - Creates user systemd services (proxy, web, kiosk, rotate.path+service)
+# - Enables seatd, adds user to required groups (video, render, input)
+# - Sets fbcon rotation at boot; applies Wayland session rotation reliably
+# - Sets transparent cursor theme and env for kiosk
+#
+# Usage:
+#   chmod +x setup.sh
+#   ./setup.sh [--web-port 8088] [--proxy-port 8811] \
+#              [--fbcon-rotate 0|1|2|3] \
+#              [--session-rotate auto|0|90|180|270] \
+#              [--session-output HDMI-A-1] \
+#              [--cursor hide|show] \
+#              [--kiosk-url http://localhost:8088]
+#
+# Flags default to the values shown in brackets above.
+
 set -euo pipefail
 
-### ---------- Defaults (can be overridden by CLI flags) ----------
-WEB_PORT=${WEB_PORT:-8088}
-PROXY_PORT=${PROXY_PORT:-8811}
+# ------------------------------- Defaults -------------------------------------
+WEB_PORT="8088"
+PROXY_PORT="8811"
+FB_ROTATE=""                 # unset means "don't touch cmdline.txt"
+SESSION_ROTATE="auto"        # auto derives from fbcon=rotate:N at boot
+SESSION_OUTPUT=""            # e.g., HDMI-A-1; empty means "all connected outputs"
+CURSOR_MODE="hide"           # hide|show
+KIOSK_URL=""                 # default constructed later
 
-# Rotation:
-# fbcon rotate: 0=0°, 1=90°, 2=180°, 3=270°. Empty = don't touch boot TTY.
-FBCON_ROTATE=${FBCON_ROTATE:-}          # e.g. 1 or 3
-# session rotation: auto|0|90|180|270 (auto = follow fbcon if set, else 0°)
-SESSION_ROTATE=${SESSION_ROTATE:-auto}
-# Wayland output to rotate: empty = rotate all connected (recommended)
-SESSION_OUTPUT=${SESSION_OUTPUT:-}      # e.g. HDMI-A-1
-
-# Cursor hidden by default
-CURSOR_MODE=${CURSOR_MODE:-hide}        # hide|show
-
-### ---------- CLI flags ----------
-usage() {
-  cat <<EOF
-Usage: $0 [--fbcon-rotate {0|1|2|3}] [--session-rotate {auto|0|90|180|270}]
-          [--session-output HDMI-A-1] [--cursor {hide|show}]
-Examples:
-  $0 --fbcon-rotate 1 --session-rotate auto --cursor hide
-  $0 --session-rotate 270 --cursor hide
-EOF
-}
+# --------------------------- Parse CLI arguments -------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --fbcon-rotate)       FBCON_ROTATE="${2:?}"; shift 2;;
-    --session-rotate)     SESSION_ROTATE="${2:?}"; shift 2;;
-    --session-output)     SESSION_OUTPUT="${2:?}"; shift 2;;
-    --cursor)             CURSOR_MODE="${2:?}"; shift 2;;
-    -h|--help)            usage; exit 0;;
-    *) echo "Unknown arg: $1"; usage; exit 1;;
+    --web-port)         WEB_PORT="${2:?}"; shift 2;;
+    --proxy-port)       PROXY_PORT="${2:?}"; shift 2;;
+    --fbcon-rotate)     FB_ROTATE="${2:?}"; shift 2;;
+    --session-rotate)   SESSION_ROTATE="${2:?}"; shift 2;;
+    --session-output)   SESSION_OUTPUT="${2:?}"; shift 2;;
+    --cursor)           CURSOR_MODE="${2:?}"; shift 2;;
+    --kiosk-url)        KIOSK_URL="${2:?}"; shift 2;;
+    -h|--help)
+      sed -n '1,60p' "$0"; exit 0;;
+    *)
+      echo "Unknown arg: $1" >&2; exit 1;;
   esac
 done
 
-### ---------- Paths & basics ----------
-say(){ echo -e "\033[1;36m==>\033[0m $*"; }
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$SCRIPT_DIR"
-USER_NAME="$(id -un)"
-USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
-SYSTEMD_USER_DIR="$USER_HOME/.config/systemd/user"
-DROPIN_DIR="$SYSTEMD_USER_DIR/poster-kiosk.service.d"
-VENV_DIR="$REPO_DIR/.venv"
-PROXY_DIR="$REPO_DIR/proxy"
-WEB_DIR="$REPO_DIR/web"
-PROXY_SERVICE="$SYSTEMD_USER_DIR/poster-proxy.service"
-WEB_SERVICE="$SYSTEMD_USER_DIR/poster-web.service"
-KIOSK_SERVICE="$SYSTEMD_USER_DIR/poster-kiosk.service"
-ROTATE_SERVICE="$SYSTEMD_USER_DIR/poster-rotate.service"
-ROTATE_PATH="$SYSTEMD_USER_DIR/poster-rotate.path"
-CHROMIUM_BIN=""
+# ----------------------------- Paths & bins ------------------------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+USER_SYSTEMD_DIR="${HOME}/.config/systemd/user"
+BIN_CHROMIUM="$(command -v chromium-browser || command -v chromium || echo /usr/bin/chromium-browser)"
+BIN_CAGE="$(command -v cage || echo /usr/bin/cage)"
+BIN_WLR_RANDR="$(command -v wlr-randr || echo /usr/bin/wlr-randr)"
+[[ -z "${KIOSK_URL}" ]] && KIOSK_URL="http://localhost:${WEB_PORT}"
 
-[[ -f /etc/os-release ]] && . /etc/os-release && say "OS: $PRETTY_NAME"
+# ------------------------------- Helpers ---------------------------------------
+log()  { printf "\033[1;36m[setup]\033[0m %s\n" "$*"; }
+warn() { printf "\033[1;33m[warn]\033[0m  %s\n" "$*"; }
+die()  { printf "\033[1;31m[err]\033[0m   %s\n" "$*" >&2; exit 1; }
 
-if [[ ! -d "$PROXY_DIR" || ! -d "$WEB_DIR" ]]; then
-  echo "ERROR: expected ./proxy and ./web under $REPO_DIR"; exit 1
-fi
-
-### ---------- Packages ----------
-say "Installing deps (sudo)…"
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -y
-# chromium can be chromium-browser or chromium
-if ! command -v chromium-browser >/dev/null 2>&1 && ! command -v chromium >/dev/null 2>&1; then
-  sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
-fi
-sudo apt-get install -y python3-venv python3-pip cage seatd x11-apps imagemagick
-
-# Chromium path
-if command -v chromium-browser >/dev/null 2>&1; then
-  CHROMIUM_BIN="$(command -v chromium-browser)"
-else
-  CHROMIUM_BIN="$(command -v chromium)"
-fi
-say "Chromium: $CHROMIUM_BIN"
-
-### ---------- Groups & seatd ----------
-say "Ensuring user in video/render/input…"
-NEED_REBOOT=false
-for g in video render input; do
-  if ! id -nG "$USER_NAME" | tr ' ' '\n' | grep -qx "$g"; then
-    sudo usermod -aG "$g" "$USER_NAME"
-    NEED_REBOOT=true
+need_sudo() {
+  if ! sudo -n true 2>/dev/null; then
+    log "This script will run a few commands with sudo (you may be prompted)."
   fi
-done
-say "Enabling seatd…"
-sudo systemctl enable --now seatd.service >/dev/null 2>&1 || true
+}
 
-### ---------- Python venv ----------
-say "Setting up Python venv…"
-python3 -m venv "$VENV_DIR"
-# shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
-pip install --upgrade pip >/dev/null
-pip install flask requests requests-cache pillow >/dev/null
-deactivate
+apt_install() {
+  local pkgs=("$@")
+  sudo DEBIAN_FRONTEND=noninteractive apt-get update -y
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${pkgs[@]}"
+}
 
-### ---------- Transparent cursor theme (no system-wide nuke) ----------
-say "Installing transparent cursor theme…"
-ensure_transparent_theme() {
-  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
-  sudo rm -f /usr/share/icons/transparent/cursors || true
-  sudo mkdir -p /usr/share/icons/transparent/cursors
-  convert -size 1x1 xc:none "$tmp/transparent.png"
-  cat >"$tmp/left_ptr.in" <<'EOF'
-16 1 1 transparent.png 0 0
-24 1 1 transparent.png 0 0
-32 1 1 transparent.png 0 0
-48 1 1 transparent.png 0 0
-64 1 1 transparent.png 0 0
-EOF
-  xcursorgen "$tmp/left_ptr.in" "$tmp/left_ptr"
-  sudo install -m 0644 "$tmp/left_ptr" /usr/share/icons/transparent/cursors/left_ptr
-  for n in default arrow top_left_arrow hand1 hand2 hand pointer \
-           watch left_ptr_watch progress wait xterm text ibeam cell crosshair \
-           all-scroll not-allowed no-drop context-menu help question_arrow \
-           grab grabbing fleur move \
-           n-resize s-resize e-resize w-resize ne-resize nw-resize se-resize sw-resize \
-           ns-resize ew-resize nesw-resize nwse-resize col-resize row-resize \
-           zoom-in zoom-out alias copy link; do
-    sudo ln -sfn left_ptr "/usr/share/icons/transparent/cursors/$n"
+ensure_groups() {
+  local g; for g in video render input; do
+    if ! id -nG "$USER" | grep -qw "$g"; then
+      sudo usermod -aG "$g" "$USER"
+      log "Added $USER to group: $g (relogin not required for systemd user services)."
+    fi
   done
 }
-ensure_transparent_theme
 
-### ---------- systemd user services ----------
-say "Writing systemd user services…"
-mkdir -p "$SYSTEMD_USER_DIR"
+enable_seatd() {
+  sudo systemctl enable --now seatd.service
+}
 
-# Proxy
-cat >"$PROXY_SERVICE" <<EOF
+enable_linger() {
+  loginctl enable-linger "$USER" || true
+}
+
+# ------------------------- Transparent cursor theme ---------------------------
+ensure_transparent_theme() {
+  [[ "$CURSOR_MODE" != "hide" ]] && return 0
+  log "Installing transparent Xcursor theme…"
+  sudo mkdir -p /usr/share/icons/transparent/cursors
+  sudo mkdir -p /usr/share/icons/default
+
+  # Write theme metadata
+  sudo tee /usr/share/icons/transparent/index.theme >/dev/null <<'EOT'
+[Icon Theme]
+Name=transparent
+Comment=Fully transparent cursors for kiosk
+Inherits=
+Directories=cursors
+EOT
+  sudo tee /usr/share/icons/default/index.theme >/dev/null <<'EOT'
+[Icon Theme]
+Inherits=transparent
+EOT
+
+  # Create a 1x1 transparent PNG from base64 (no ImageMagick dependency)
+  sudo tee /usr/share/icons/transparent/cursors/blank.png >/dev/null <<'EOPNG'
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/aq1p6QAAAAASUVORK5CYII=
+EOPNG
+
+  # Generate an Xcursor from the PNG (needs xcursorgen)
+  sudo tee /usr/share/icons/transparent/cursors/left_ptr.in >/dev/null <<'EOT'
+32 0 0 blank.png 1
+24 0 0 blank.png 1
+16 0 0 blank.png 1
+EOT
+  if ! command -v xcursorgen >/dev/null 2>&1; then
+    apt_install xcursorgen
+  fi
+  (cd /usr/share/icons/transparent/cursors && sudo xcursorgen left_ptr.in left_ptr)
+
+  # Symlink common cursor names to left_ptr
+  local names=(right_ptr pointer hand1 hand2 xterm text watch cross crosshair sb_h_double_arrow sb_v_double_arrow
+               sb_left_arrow sb_right_arrow sb_up_arrow sb_down_arrow fleur grabbing grab)
+  for n in "${names[@]}"; do
+    sudo ln -sf left_ptr "/usr/share/icons/transparent/cursors/$n"
+  done
+}
+
+# ------------------------------- Packages -------------------------------------
+install_packages() {
+  log "Installing packages (Chromium, cage, seatd, Python venv, wlroots utils)…"
+  apt_install \
+    chromium-browser \
+    cage \
+    seatd \
+    python3-venv python3-pip \
+    wlr-randr \
+    ca-certificates \
+    fonts-dejavu-core
+}
+
+# ----------------------------- Kiosk service ----------------------------------
+write_kiosk_service() {
+  log "Writing poster-kiosk.service (Chromium in cage on tty1)…"
+  mkdir -p "${USER_SYSTEMD_DIR}"
+  tee "${USER_SYSTEMD_DIR}/poster-kiosk.service" >/dev/null <<EOF
 [Unit]
-Description=PosterWall Flask Proxy
-After=network-online.target
-
-[Service]
-ExecStart=$VENV_DIR/bin/python $PROXY_DIR/app.py
-WorkingDirectory=$PROXY_DIR
-Restart=on-failure
-Environment=PYTHONUNBUFFERED=1
-
-[Install]
-WantedBy=default.target
-EOF
-
-# Static web
-cat >"$WEB_SERVICE" <<EOF
-[Unit]
-Description=PosterWall Static Web (:${WEB_PORT})
-After=poster-proxy.service
-
-[Service]
-ExecStart=/usr/bin/python3 -m http.server ${WEB_PORT}
-WorkingDirectory=$WEB_DIR
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-EOF
-
-# Kiosk (Cage + Chromium) – minimal, stable
-KIOSK_CMD="cage -s -- \"$CHROMIUM_BIN\" --no-first-run --no-default-browser-check --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --check-for-update-interval=31536000 --ozone-platform=wayland --overscroll-history-navigation=0 --disable-pinch \"http://localhost:${WEB_PORT}\""
-cat >"$KIOSK_SERVICE" <<EOF
-[Unit]
-Description=Wayland Kiosk for PosterWall (cage + Chromium)
-After=network-online.target poster-web.service
-Wants=poster-web.service
+Description=Poster Wall Kiosk (Chromium + cage, Wayland)
+After=network-online.target seatd.service
+Wants=network-online.target
+Requires=seatd.service
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sleep 2
-ExecStart=/bin/sh -lc '$KIOSK_CMD'
-StandardInput=null
-StandardOutput=journal
-StandardError=journal
+# Run on tty1
+StandardInput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+# Cursor env (theme installed by setup)
+Environment=XCURSOR_THEME=${CURSOR_MODE/hide/transparent}
+Environment=XCURSOR_SIZE=24
+Environment=XCURSOR_PATH=/usr/share/icons/transparent:/usr/share/icons:/usr/local/share/icons
+# Wayland ozone flags for Chromium
+Environment=QT_QPA_PLATFORM=wayland
+Environment=MOZ_ENABLE_WAYLAND=1
+# Ensure HOME is respected for Wayland runtime dir
+Environment=XDG_RUNTIME_DIR=%t
+# Cage should own the seat for DRM/input
+ExecStart=${BIN_CAGE} -s -- ${BIN_CHROMIUM} \\
+  --enable-features=UseOzonePlatform \\
+  --ozone-platform=wayland \\
+  --kiosk \\
+  --app=${KIOSK_URL} \\
+  --no-first-run --noerrdialogs --disable-session-crashed-bubble --disable-infobars \\
+  --autoplay-policy=no-user-gesture-required --overscroll-history-navigation=0 --disable-pinch
 Restart=always
 RestartSec=2
 
 [Install]
 WantedBy=default.target
 EOF
+}
 
-# Cursor drop-in
-mkdir -p "$DROPIN_DIR"
-if [[ "$CURSOR_MODE" == "hide" ]]; then
-cat >"$DROPIN_DIR/cursor.conf" <<'EOF'
+# ------------------------------- Web service ----------------------------------
+write_web_service() {
+  log "Writing poster-web.service (static http.server on :${WEB_PORT})…"
+  tee "${USER_SYSTEMD_DIR}/poster-web.service" >/dev/null <<EOF
+[Unit]
+Description=Poster Wall Web (static files)
+After=network.target
+
 [Service]
-Environment=XCURSOR_THEME=transparent
-Environment=XCURSOR_PATH=/usr/share/icons/transparent:/usr/share/icons:/usr/local/share/icons
-Environment=XCURSOR_SIZE=24
-EOF
-else
-rm -f "$DROPIN_DIR/cursor.conf" 2>/dev/null || true
-fi
+Type=simple
+WorkingDirectory=${REPO_ROOT}/web
+ExecStart=/usr/bin/python3 -m http.server ${WEB_PORT}
+Restart=on-failure
+RestartSec=2
 
-### ---------- Rotation oneshot + path ----------
-say "Installing rotation oneshot + path…"
-sudo tee /usr/local/bin/poster-rotate-oneshot >/dev/null <<'EOF'
+[Install]
+WantedBy=default.target
+EOF
+}
+
+# ------------------------------ Proxy service ---------------------------------
+write_proxy_launcher() {
+  log "Writing proxy launcher + service (Flask) on :${PROXY_PORT}…"
+  sudo tee /usr/local/bin/poster-proxy-launch >/dev/null <<'EOSH'
 #!/usr/bin/env bash
-# Rotate Cage outputs in the current user Wayland session, then exit 0.
-# TRANSFORM: 0|90|180|270|auto ; OUTPUT: e.g. HDMI-A-1 ; default rotate all
 set -euo pipefail
+PORT="${1:-8811}"
+cd "$(dirname "$0")" 2>/dev/null || true
+# Try to cd into repo proxy dir if installed there
+if [[ -d "$HOME/poster-wall/proxy" ]]; then cd "$HOME/poster-wall/proxy"; fi
+if [[ -d "./proxy" ]]; then cd "./proxy"; fi
+
+python3 -m venv .venv
+# shellcheck disable=SC1091
+source .venv/bin/activate
+if [[ -f requirements.txt ]]; then pip install -r requirements.txt; fi
+
+# Heuristic: app.py > server.py > module "proxy"
+if [[ -f app.py ]]; then
+  exec python app.py --port "$PORT"
+elif [[ -f server.py ]]; then
+  exec python server.py --port "$PORT"
+else
+  # If user has FLASK_APP, respect it; otherwise try "proxy" module
+  export FLASK_RUN_PORT="$PORT"
+  if [[ -n "${FLASK_APP:-}" ]]; then
+    exec python -m flask run --host 0.0.0.0 --port "$PORT"
+  else
+    exec python -m proxy
+  fi
+fi
+EOSH
+  sudo chmod +x /usr/local/bin/poster-proxy-launch
+}
+
+write_proxy_service() {
+  tee "${USER_SYSTEMD_DIR}/poster-proxy.service" >/dev/null <<EOF
+[Unit]
+Description=Poster Wall Proxy API (Flask)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${REPO_ROOT}
+ExecStart=/usr/local/bin/poster-proxy-launch ${PROXY_PORT}
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+# ------------------------- Rotation: oneshot + path ---------------------------
+write_rotate_script() {
+  log "Installing rotation script (/usr/local/bin/poster-rotate-oneshot)…"
+  sudo tee /usr/local/bin/poster-rotate-oneshot >/dev/null <<'EOSH'
+#!/usr/bin/env bash
+set -euo pipefail
+log(){ echo "[poster-rotate] $*"; }
+
 TR="${TRANSFORM:-auto}"
 OUT="${OUTPUT:-}"
-# auto -> derive from fbcon
+
+# auto -> derive from fbcon rotate
 if [[ "$TR" == "auto" || -z "$TR" ]]; then
   fb=$(grep -o 'fbcon=rotate:[0-3]' /proc/cmdline | awk -F: '{print $3}' || true)
   case "$fb" in
-    1) TR=90;; 2) TR=180;; 3) TR=270;; *) TR=0;;
+    1) TR=90;;
+    2) TR=180;;
+    3) TR=270;;
+    *) TR=0;;
   esac
 fi
+
 uid="$(id -u)"; RUNDIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"; mkdir -p "$RUNDIR"
-# wait up to ~15s for a usable wayland socket with outputs
-for i in $(seq 1 75); do
+log "target transform: ${TR}${OUT:+ on $OUT}"
+
+# wait up to ~20s for a Wayland socket that reports outputs
+for i in $(seq 1 100); do
   for s in "$RUNDIR"/wayland-[0-9]*; do
-    [ -S "$s" ] || continue
+    [[ -S "$s" ]] || continue
     sock="$(basename "$s")"
     if env WAYLAND_DISPLAY="$sock" wlr-randr >/dev/null 2>&1; then
-      sleep 0.4
+      sleep 0.5
+
+      # apply
       if [[ -n "$OUT" ]]; then
         env WAYLAND_DISPLAY="$sock" wlr-randr --output "$OUT" --transform "$TR" || true
       else
@@ -235,123 +301,114 @@ for i in $(seq 1 75); do
           env WAYLAND_DISPLAY="$sock" wlr-randr --output "$o" --transform "$TR" || true
         done
       fi
-      exit 0
+
+      # verify: ensure at least one connected output reports desired Transform
+      if env WAYLAND_DISPLAY="$sock" wlr-randr | awk -v want="$TR" '
+          $2=="connected"{dev=$1}
+          $1=="Transform:"{tr=$2; if (dev!=""){print dev, tr; dev=""}}
+        ' | awk -v want="$TR" 'NR>0 {if ($2==want) ok=1} END{exit ok?0:1}'
+      then
+        log "verify OK on $sock"
+        exit 0
+      else
+        log "verify failed on $sock, retrying…"
+      fi
     fi
   done
   sleep 0.2
 done
-exit 0
-EOF
-sudo chmod +x /usr/local/bin/poster-rotate-oneshot
 
-# user oneshot service + path trigger
-cat >"$ROTATE_SERVICE" <<EOF
+log "no usable Wayland outputs; giving up"
+exit 1
+EOSH
+  sudo chmod +x /usr/local/bin/poster-rotate-oneshot
+}
+
+write_rotate_units() {
+  log "Writing poster-rotate.service + .path (triggered by Wayland socket)…"
+  tee "${USER_SYSTEMD_DIR}/poster-rotate.service" >/dev/null <<EOF
 [Unit]
 Description=Rotate Cage outputs to portrait (session)
+After=poster-kiosk.service seatd.service
+Requires=seatd.service
 
 [Service]
 Type=oneshot
 Environment=TRANSFORM=${SESSION_ROTATE}
-$( [[ -n "$SESSION_OUTPUT" ]] && echo "Environment=OUTPUT=${SESSION_OUTPUT}" )
+Environment=OUTPUT=${SESSION_OUTPUT}
 ExecStart=/usr/local/bin/poster-rotate-oneshot
 RemainAfterExit=yes
-EOF
-
-cat >"$ROTATE_PATH" <<'EOF'
-[Unit]
-Description=Trigger poster-rotate when Wayland socket appears
-
-[Path]
-PathExistsGlob=%t/wayland-[0-9]*
-Unit=poster-rotate.service
 
 [Install]
 WantedBy=default.target
 EOF
 
-### ---------- Helper toggles ----------
-say "Installing helper toggles…"
-sudo tee /usr/local/bin/poster-hide-cursor >/dev/null <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-USER_NAME="${SUDO_USER:-$USER}"
-DROPIN_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/.config/systemd/user/poster-kiosk.service.d"
-sudo mkdir -p /usr/share/icons/transparent/cursors
-# ensure theme exists
-if [ ! -f /usr/share/icons/transparent/cursors/left_ptr ]; then
-  tmp="$(mktemp -d)"; convert -size 1x1 xc:none "$tmp/t.png"
-  cat >"$tmp/left_ptr.in" <<'EOF'
-16 1 1 t.png 0 0
-24 1 1 t.png 0 0
-32 1 1 t.png 0 0
-48 1 1 t.png 0 0
-64 1 1 t.png 0 0
+  tee "${USER_SYSTEMD_DIR}/poster-rotate.path" >/dev/null <<'EOF'
+[Unit]
+Description=Watch for Wayland display socket; trigger rotation
+
+[Path]
+PathExistsGlob=%t/wayland-*
+
+[Install]
+WantedBy=default.target
 EOF
-  xcursorgen "$tmp/left_ptr.in" "$tmp/left_ptr"
-  sudo install -m 0644 "$tmp/left_ptr" /usr/share/icons/transparent/cursors/left_ptr
-fi
-mkdir -p "$DROPIN_DIR"
-cat >"$DROPIN_DIR/cursor.conf" <<'EOF'
-[Service]
-Environment=XCURSOR_THEME=transparent
-Environment=XCURSOR_PATH=/usr/share/icons/transparent:/usr/share/icons:/usr/local/share/icons
-Environment=XCURSOR_SIZE=24
-EOF
-systemctl --user daemon-reload
-systemctl --user restart poster-kiosk.service
-echo "Cursor hidden."
-EOS
-sudo chmod +x /usr/local/bin/poster-hide-cursor
+}
 
-sudo tee /usr/local/bin/poster-show-cursor >/dev/null <<'EOS'
-#!/usr/bin/env bash
-set -euo pipefail
-USER_NAME="${SUDO_USER:-$USER}"
-DROPIN_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/.config/systemd/user/poster-kiosk.service.d"
-rm -f "$DROPIN_DIR/cursor.conf" || true
-systemctl --user daemon-reload
-systemctl --user restart poster-kiosk.service
-echo "Cursor shown."
-EOS
-sudo chmod +x /usr/local/bin/poster-show-cursor
+# ------------------------------- fbcon rotate ---------------------------------
+apply_fbcon_rotate() {
+  [[ -z "${FB_ROTATE}" ]] && return 0
+  local cmdline="/boot/firmware/cmdline.txt"
+  log "Applying fbcon=rotate:${FB_ROTATE} to ${cmdline}…"
+  if [[ -f "$cmdline" ]]; then
+    sudo sed -i -E 's/fbcon=rotate:[0-3]//g' "$cmdline"
+    # Ensure single line; append the arg
+    echo | sudo tee -a "$cmdline" >/dev/null
+    sudo sed -i 's/  \+/ /g;s/^ //;s/ $//' "$cmdline"
+    sudo sed -i -E 's/$/ fbcon=rotate:'"${FB_ROTATE}"'/' "$cmdline"
+  else
+    warn "Cannot find ${cmdline}; skipping fbcon rotation."
+  fi
+}
 
-### ---------- Enable lingering & services ----------
-say "Enabling user lingering…"
-sudo loginctl enable-linger "$USER_NAME" >/dev/null || true
+# ------------------------------- Systemd apply --------------------------------
+reload_enable_start() {
+  systemctl --user daemon-reload
+  systemctl --user enable --now poster-web.service
+  systemctl --user enable --now poster-proxy.service
+  systemctl --user enable --now poster-kiosk.service
+  systemctl --user enable --now poster-rotate.path
+  # Service will be triggered by the .path when Wayland socket appears
+}
 
-say "Enabling & starting services…"
-systemctl --user daemon-reload
-systemctl --user enable poster-proxy.service poster-web.service poster-kiosk.service poster-rotate.path poster-rotate.service >/dev/null
-systemctl --user restart poster-proxy.service poster-web.service poster-kiosk.service
-# start rotator once now (path will also trigger when socket appears)
-systemctl --user start poster-rotate.service || true
+# --------------------------------- Main ---------------------------------------
+need_sudo
+install_packages
+enable_seatd
+ensure_groups
+enable_linger
+ensure_transparent_theme
 
-### ---------- Optional boot console rotation (safe, resolution-agnostic) ----------
-if [[ -n "${FBCON_ROTATE}" ]]; then
-  say "Setting boot console rotation to fbcon=rotate:${FBCON_ROTATE}…"
-  BOOT=/boot/firmware; [[ -f /boot/cmdline.txt ]] && BOOT=/boot
-  sudo cp "$BOOT/cmdline.txt" "$BOOT/cmdline.txt.bak.$(date +%s)"
-  sudo sed -i 's/ fbcon=rotate:[0-3]//g' "$BOOT/cmdline.txt"
-  sudo sed -i "1 s/\$/ fbcon=rotate:${FBCON_ROTATE}/" "$BOOT/cmdline.txt"
-  say "fbcon set. Reboot to see boot/shutdown text rotated."
-fi
+write_kiosk_service
+write_web_service
+write_proxy_launcher
+write_proxy_service
 
-### ---------- Boot tweaks (optional, harmless) ----------
-BOOT_FW="/boot/firmware"; [ -e /boot/cmdline.txt ] && BOOT_FW="/boot"
-CMDLINE="$BOOT_FW/cmdline.txt"; CONFIGTXT="$BOOT_FW/config.txt"
-if [[ -e "$CMDLINE" && -e "$CONFIGTXT" ]]; then
-  say "Applying boot tweaks (consoleblank=0, gpu_mem=256, hdmi_force_hotplug=1)…"
-  sudo cp "$CMDLINE"   "$CMDLINE.bak.$(date +%s)"
-  sudo cp "$CONFIGTXT" "$CONFIGTXT.bak.$(date +%s)"
-  grep -qw "consoleblank=0" "$CMDLINE" || sudo sed -i 's/$/ consoleblank=0/' "$CMDLINE"
-  sudo sed -i '/^gpu_mem=/d' "$CONFIGTXT"
-  echo "gpu_mem=256" | sudo tee -a "$CONFIGTXT" >/dev/null
-  grep -q '^hdmi_force_hotplug=' "$CONFIGTXT" || echo "hdmi_force_hotplug=1" | sudo tee -a "$CONFIGTXT" >/dev/null
-fi
+write_rotate_script
+write_rotate_units
 
+apply_fbcon_rotate
+reload_enable_start
+
+log "Done. Services:"
+echo "  - poster-web.service     (static site on :${WEB_PORT})"
+echo "  - poster-proxy.service   (Flask proxy on :${PROXY_PORT})"
+echo "  - poster-kiosk.service   (Chromium in cage on tty1)"
+echo "  - poster-rotate.path/.service (session rotation watcher)"
 echo
-echo "✅ Poster Wall kiosk installed."
-echo "   Web:   http://localhost:${WEB_PORT}"
-echo "   Proxy: http://localhost:${PROXY_PORT}"
-echo "   Cursor: ${CURSOR_MODE}  |  Session rotate: ${SESSION_ROTATE}  |  fbcon: ${FBCON_ROTATE:-none}"
-$NEED_REBOOT && echo "NOTE: you were added to video/render/input; reboot recommended."
+echo "Useful checks:"
+echo "  journalctl --user -u poster-rotate.service -n 120 --no-pager -o cat"
+echo "  WAYLAND_DISPLAY=wayland-0 ${BIN_WLR_RANDR} | sed -n '/HDMI-A-1/,/Transform/p'"
+echo "  systemctl --user status poster-kiosk.service --no-pager"
+echo
+[[ -n "${FB_ROTATE}" ]] && warn "fbcon rotation updated; reboot to affect boot-time console rotation."
