@@ -87,11 +87,13 @@
             throw new Error('Plex authentication failed. Please check your Plex token.');
           } else if (r.status === 404) {
             throw new Error(`Plex section ${cfg.sectionId} not found. Please check your section ID.`);
-          } else if (r.status >= 500) {
+          } else if (r.status === 400) {
             // Check if this might be due to incomplete config
             if (!cfg.plexUrl || !cfg.plexToken) {
               throw new Error('Plex configuration incomplete. Please check your Plex URL and token on the settings page.');
             }
+            throw new Error(`Invalid request (${r.status}). Please check your configuration.`);
+          } else if (r.status >= 500) {
             throw new Error(`Plex server error (${r.status}). Please check your Plex server.`);
           } else {
             throw new Error(`Movies service error (${r.status}). Please check your configuration.`);
