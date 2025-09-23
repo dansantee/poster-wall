@@ -51,7 +51,7 @@
     };
     
     if (!config.plexUrl || !config.plexToken) {
-      const error = new Error('Configuration incomplete. Please ensure Plex URL and token are configured.');
+      const error = new Error('Plex configuration incomplete. Please check your Plex URL and token on the settings page.');
       error.config = config; // attach config so we can get hostname
       throw error;
     }
