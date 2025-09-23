@@ -123,6 +123,64 @@
     return out;
   }
 
+  // ---- icon mapping helpers ----
+  function getContentRatingIcon(rating) {
+    if (!rating || rating === 'N/A') return 'info-icons/Rated-NA.png';
+    
+    const ratingMap = {
+      'TV-Y': 'info-icons/Rated-TVY.png',
+      'TV-Y7': 'info-icons/Rated-TVY7.png',
+      'TV-Y7 FV': 'info-icons/Rated-TVY7.png',
+      'G': 'info-icons/Rated-G.png',
+      'TV-G': 'info-icons/Rated-TVG.png',
+      'PG': 'info-icons/Rated-PG.png',
+      'TV-PG': 'info-icons/Rated-TVPG.png',
+      'PG-13': 'info-icons/Rated-PG13.png',
+      'TV-14': 'info-icons/Rated-TV14.png',
+      'R': 'info-icons/Rated-R.png',
+      'TV-MA': 'info-icons/Rated-TVMA.png',
+      'NC-17': 'info-icons/Rated-NC17.png',
+      'XXX': 'info-icons/Rated-XXX.png'
+    };
+    
+    return ratingMap[rating] || 'info-icons/Rated-NA.png';
+  }
+
+  function getVideoResolutionIcon(resolution) {
+    if (!resolution || resolution === 'N/A') return null;
+    
+    const resMap = {
+      'sd': 'info-icons/Res-SD.png',
+      '720': 'info-icons/Res-HD720.png',
+      '720p': 'info-icons/Res-HD720.png',
+      '1080': 'info-icons/Res-HD1080.png',
+      '1080p': 'info-icons/Res-HD1080.png',
+      '4k': 'info-icons/Res-UHD4K.png',
+      '8k': 'info-icons/Res-UHD8K.png'
+    };
+    
+    return resMap[resolution.toLowerCase()] || null;
+  }
+
+  function getAudioChannelIcon(channels) {
+    if (!channels || channels === 'N/A') return null;
+    
+    const channelMap = {
+      'mono': 'info-icons/Sound-Mono.png',
+      'stereo': 'info-icons/Sound-2.0.png',
+      '2.0': 'info-icons/Sound-2.0.png',
+      '5.1': 'info-icons/Sound-5.1.png',
+      '7.1': 'info-icons/Dolby_TRUEHD71.png'
+    };
+    
+    // Handle 5.1 variations (5.1, 5.1(side), etc.)
+    if (channels.includes('5.1')) {
+      return 'info-icons/Sound-5.1.png';
+    }
+    
+    return channelMap[channels.toLowerCase()] || null;
+  }
+
   // ---- auto-dim brightness helpers ----
   function computeBrightness(src) {
     return new Promise((resolve) => {
@@ -224,41 +282,40 @@
     const titleEl = document.getElementById('nowShowingTitle');
     const progressBar = document.getElementById('nowShowingProgressBar');
     const poster = document.getElementById('nowShowingPoster');
-    const movieTitle = document.getElementById('nowShowingMovieTitle');
-    const videoInfo = document.getElementById('nowShowingVideoInfo');
-    const audioInfo = document.getElementById('nowShowingAudioInfo');
-    const rating = document.getElementById('nowShowingRating');
+    const iconsContainer = document.getElementById('nowShowingMetadataIcons');
 
     if (titleEl) titleEl.textContent = cfg.nowShowingText;
     if (progressBar) progressBar.style.width = `${data.progress || 0}%`;
     if (poster && data.poster) poster.src = prox(data.poster);
-    if (movieTitle) movieTitle.textContent = data.title || 'Unknown Title';
     
-    // Format video info
-    let videoText = '';
-    if (data.videoResolution && data.videoCodec) {
-      videoText = `${data.videoResolution.toUpperCase()} ${data.videoCodec}`;
-    } else if (data.videoResolution) {
-      videoText = data.videoResolution.toUpperCase();
-    } else if (data.videoCodec) {
-      videoText = data.videoCodec;
-    } else {
-      videoText = '-';
+    // Clear existing icons
+    if (iconsContainer) {
+      iconsContainer.innerHTML = '';
+      
+      // Create and add icons based on available metadata
+      const icons = [];
+      
+      // Video resolution icon
+      const videoIcon = getVideoResolutionIcon(data.videoResolution);
+      if (videoIcon) {
+        icons.push(`<img src="${videoIcon}" class="now-showing-metadata-icon" alt="${data.videoResolution || 'Unknown Resolution'}" />`);
+      }
+      
+      // Audio channels icon
+      const audioIcon = getAudioChannelIcon(data.audioChannels);
+      if (audioIcon) {
+        icons.push(`<img src="${audioIcon}" class="now-showing-metadata-icon" alt="${data.audioChannels || 'Unknown Audio'}" />`);
+      }
+      
+      // Content rating icon (always show, fallback to N/A)
+      const ratingIcon = getContentRatingIcon(data.rating);
+      if (ratingIcon) {
+        icons.push(`<img src="${ratingIcon}" class="now-showing-metadata-icon" alt="${data.rating || 'Not Rated'}" />`);
+      }
+      
+      // Insert all icons
+      iconsContainer.innerHTML = icons.join('');
     }
-    if (videoInfo) videoInfo.textContent = videoText;
-
-    // Format audio info
-    let audioText = '';
-    if (data.audioCodec && data.audioChannels) {
-      audioText = `${data.audioCodec} ${data.audioChannels}`;
-    } else if (data.audioCodec) {
-      audioText = data.audioCodec;
-    } else {
-      audioText = '-';
-    }
-    if (audioInfo) audioInfo.textContent = audioText;
-
-    if (rating) rating.textContent = data.rating || '-';
 
     // Show now playing screen
     nowShowing.classList.add('visible');
