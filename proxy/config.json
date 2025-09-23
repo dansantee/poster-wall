@@ -1,0 +1,12 @@
+{
+  "hostname": "Dan-Desktop",
+  "sectionId": "1",
+  "rotateSec": 10,
+  "autoDim": false,
+  "plexUrl": "",
+  "plexToken": "",
+  "plexInsecure": true,
+  "plexDevices": [
+    "192.168.1.92"
+  ]
+}

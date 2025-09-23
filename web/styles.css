@@ -45,7 +45,7 @@ body.onesheet #stage{
 .card{background:var(--card);border:1px solid #151c27;border-radius:var(--radius);padding:16px;margin:16px;max-width:900px;box-shadow:var(--shadow)}
 .card h2{margin-top:0}
 label{display:block;margin:8px 0}
-input{width:100%;padding:10px;border-radius:10px;border:1px solid #293041;background:#0b0f16;color:#e9eef7}
+input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293041;background:#0b0f16;color:#e9eef7;font-family:inherit;font-size:inherit;resize:vertical}
 .muted{color:var(--muted)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .pre{background:#0b0f16;border:1px solid #1a2230;border-radius:10px;padding:10px;overflow:auto;max-height:260px}

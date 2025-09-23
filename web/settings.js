@@ -35,6 +35,7 @@
       if (has('plexUrl'))     el('plexUrl').value      = cfg.plexUrl   ?? '';
       if (has('plexToken'))   el('plexToken').value    = cfg.plexToken ?? '';
       if (has('plexInsecure'))el('plexInsecure').checked = cfg.plexInsecure ?? true;
+      if (has('plexDevices')) el('plexDevices').value   = (cfg.plexDevices || []).join('\n');
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
@@ -64,6 +65,12 @@
           }
           if (has('plexToken'))    next.plexToken    = (el('plexToken').value || '').trim();
           if (has('plexInsecure')) next.plexInsecure = !!el('plexInsecure').checked;
+          if (has('plexDevices')) {
+            const devices = (el('plexDevices').value || '').split('\n')
+              .map(line => line.trim())
+              .filter(line => line.length > 0);
+            next.plexDevices = devices;
+          }
 
           await saveServerCfg(next);
           alert('Settings saved to server.');
@@ -85,7 +92,9 @@
             method: 'POST', headers
           });
           
-          if (!r.ok) {
+          if (r.ok) {
+            alert('Kiosk restart initiated.');
+          } else {
             const err = await r.text();
             alert(`Restart failed: ${err}`);
           }
@@ -110,6 +119,12 @@
         }
         if (has('plexToken'))    next.plexToken    = (el('plexToken').value || '').trim();
         if (has('plexInsecure')) next.plexInsecure = !!el('plexInsecure').checked;
+        if (has('plexDevices')) {
+          const devices = (el('plexDevices').value || '').split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+          next.plexDevices = devices;
+        }
 
         await saveServerCfg(next);
         alert('Settings saved to server.');
