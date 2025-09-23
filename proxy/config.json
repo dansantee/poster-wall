@@ -1,6 +1,9 @@
 {
   "autoDim": true,
   "hostname": "Dan-Desktop",
+  "nowShowingFont": "'Bebas Neue', sans-serif",
+  "nowShowingFontSize": 14,
+  "nowShowingText": "NOW SHOWING",
   "plexDevices": [
     "192.168.1.92"
   ],
@@ -8,6 +11,5 @@
   "plexToken": "R9TBSeRe-g6yWqtj5p2s",
   "plexUrl": "http://192.168.1.3:32400",
   "rotateSec": 10,
-  "sectionId": "1",
-  "nowShowingText": "NOW SHOWING"
+  "sectionId": "1"
 }

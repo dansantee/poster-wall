@@ -38,6 +38,8 @@
       if (has('plexDevices')) el('plexDevices').value   = (cfg.plexDevices || []).join('\n');
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
+      if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
+      if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
@@ -60,6 +62,8 @@
           if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
           if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
           if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
+          if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
+          if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
           if (has('plexUrl')) {
             let u = (el('plexUrl').value || '').trim();
             if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -115,6 +119,8 @@
         if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
         if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
         if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
+        if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
+        if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize

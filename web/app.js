@@ -49,6 +49,8 @@
       autoDim:       !!j.autoDim,
       hostname:      j.hostname      ?? '<hostname>',
       nowShowingText:j.nowShowingText?? 'NOW SHOWING',
+      nowShowingFont:j.nowShowingFont?? "'Bebas Neue', sans-serif",
+      nowShowingFontSize:j.nowShowingFontSize?? 9,
       plexDevices:   j.plexDevices   ?? []
     };
   }
@@ -181,6 +183,18 @@
     return channelMap[channels.toLowerCase()] || null;
   }
 
+  // ---- font settings helper ----
+  function applyFontSettings(cfg) {
+    const titleEl = document.getElementById('nowShowingTitle');
+    if (titleEl && cfg.nowShowingFont && cfg.nowShowingFontSize) {
+      titleEl.style.fontFamily = cfg.nowShowingFont;
+      const fontSize = cfg.nowShowingFontSize;
+      const minSize = Math.round(fontSize * 5.33); // maintain ratio: 48px at 9vw
+      const maxSize = Math.round(fontSize * 10.67); // maintain ratio: 96px at 9vw
+      titleEl.style.fontSize = `clamp(${minSize}px, ${fontSize}vw, ${maxSize}px)`;
+    }
+  }
+
   // ---- auto-dim brightness helpers ----
   function computeBrightness(src) {
     return new Promise((resolve) => {
@@ -284,7 +298,10 @@
     const poster = document.getElementById('nowShowingPoster');
     const iconsContainer = document.getElementById('nowShowingMetadataIcons');
 
-    if (titleEl) titleEl.textContent = cfg.nowShowingText;
+    if (titleEl) {
+      titleEl.textContent = cfg.nowShowingText;
+      applyFontSettings(cfg);
+    }
     if (progressBar) progressBar.style.width = `${data.progress || 0}%`;
     if (poster && data.poster) poster.src = prox(data.poster);
     
@@ -396,6 +413,9 @@
     try{
       const cfg = await loadCfg();
       const items = await fetchItems(cfg);
+      
+      // Apply initial font settings
+      applyFontSettings(cfg);
       
       // Start poster rotation
       startRotation(cfg, items);

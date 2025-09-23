@@ -162,8 +162,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-title {
   width: 95vw;
   max-width: 95vw;
-  font-size: clamp(36px, 7vw, 72px);
-  font-weight: 300;
+  font-size: clamp(72px, 14vw, 144px);
+  font-weight: 700;
   text-align: center;
   margin: 0 auto 15px auto;
   color: var(--accent);
