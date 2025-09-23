@@ -49,25 +49,64 @@
   })();
 
   function bindHandlers(cfg) {
-    // Display form
-    if (has('display-form')) {
-      el('display-form').addEventListener('submit', async (e) => {
+    // Save button
+    if (has('btnSave')) {
+      el('btnSave').addEventListener('click', async () => {
+        try {
+          const next = { ...cfg };
+          if (has('sectionId'))    next.sectionId    = (el('sectionId').value || '1').trim();
+          if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
+          if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
+          if (has('plexUrl')) {
+            let u = (el('plexUrl').value || '').trim();
+            if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
+            next.plexUrl = u;
+          }
+          if (has('plexToken'))    next.plexToken    = (el('plexToken').value || '').trim();
+          if (has('plexInsecure')) next.plexInsecure = !!el('plexInsecure').checked;
+
+          await saveServerCfg(next);
+          alert('Settings saved to server.');
+        } catch (e) {
+          alert(`Save failed: ${e}`);
+        }
+      });
+    }
+
+    // Restart button
+    if (has('btnRestart')) {
+      el('btnRestart').addEventListener('click', async () => {
+        if (!confirm('Restart the kiosk service? The display will reload.')) return;
+        
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          const key = has('adminKey') ? (el('adminKey').value || '').trim() : '';
+          if (key) headers['X-Admin-Key'] = key;
+          
+          const r = await fetch(`${proxyBase()}/api/restart-kiosk`, {
+            method: 'POST', headers
+          });
+          
+          if (r.ok) {
+            alert('Kiosk restart initiated.');
+          } else {
+            const err = await r.text();
+            alert(`Restart failed: ${err}`);
+          }
+        } catch (e) {
+          alert(`Restart error: ${e}`);
+        }
+      });
+    }
+
+    // Consolidated settings form
+    if (has('plex-form')) {
+      el('plex-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const next = { ...cfg };
         if (has('sectionId'))    next.sectionId    = (el('sectionId').value || '1').trim();
         if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
         if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
-
-        await saveServerCfg(next);
-        alert('Display settings saved to server.');
-      });
-    }
-
-    // Plex form
-    if (has('plex-form')) {
-      el('plex-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const next = { ...cfg };
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -77,7 +116,7 @@
         if (has('plexInsecure')) next.plexInsecure = !!el('plexInsecure').checked;
 
         await saveServerCfg(next);
-        alert('Plex settings saved to server.');
+        alert('Settings saved to server.');
       });
     }
 

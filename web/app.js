@@ -12,19 +12,39 @@
   // Always talk to the proxy running on this host
   function proxyBase(){ return `${location.protocol}//${location.hostname}:8811`; }
 
+  // Display error message to user
+  function showError(message) {
+    document.body.innerHTML = `<div style="color: #ff6b6b; font-family: monospace; font-size: 18px; text-align: center; padding: 50px; background: #000;">${message}</div>`;
+  }
+
   async function loadCfg(){
-    const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`GET /api/config ${r.status}`);
-    const j = await r.json();
-    // Normalize sensible defaults in case fields are missing
-    return {
-      sectionId:   j.sectionId   ?? '1',
-      rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
-      plexUrl:     j.plexUrl     ?? '',
-      plexToken:   j.plexToken   ?? '',
-      plexInsecure:!!j.plexInsecure,
-      autoDim:     !!j.autoDim
-    };
+    try {
+      const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
+      if (!r.ok) {
+        throw new Error(`Configuration service unavailable (${r.status}). Please check if the proxy server is running on port 8811.`);
+      }
+      const j = await r.json();
+      
+      // Check if config has required fields
+      if (!j.plexUrl || !j.plexToken) {
+        throw new Error('Configuration incomplete. Please ensure Plex URL and token are configured.');
+      }
+      
+      // Normalize sensible defaults in case fields are missing
+      return {
+        sectionId:   j.sectionId   ?? '1',
+        rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
+        plexUrl:     j.plexUrl     ?? '',
+        plexToken:   j.plexToken   ?? '',
+        plexInsecure:!!j.plexInsecure,
+        autoDim:     !!j.autoDim
+      };
+    } catch (error) {
+      if (error.message.includes('fetch')) {
+        throw new Error('Unable to connect to configuration service. Please ensure the proxy server is running.');
+      }
+      throw error;
+    }
   }
 
   function headers(cfg){
@@ -55,15 +75,39 @@
         start: String(start),
         size:  String(PAGE_SIZE)
       });
-      const r = await fetch(url, { cache: 'no-store', headers: h });
-      if (!r.ok) throw new Error(`Proxy ${r.status}`);
-      const j = await r.json();
-      const batch = j.items || [];
-      out.push(...batch);
-      if (batch.length < PAGE_SIZE) break;
-      start += PAGE_SIZE;
-      if (start > 50000) break; // safety guard
+      
+      try {
+        const r = await fetch(url, { cache: 'no-store', headers: h });
+        if (!r.ok) {
+          if (r.status === 401) {
+            throw new Error('Plex authentication failed. Please check your Plex token.');
+          } else if (r.status === 404) {
+            throw new Error(`Plex section ${cfg.sectionId} not found. Please check your section ID.`);
+          } else if (r.status >= 500) {
+            throw new Error(`Plex server error (${r.status}). Please check your Plex server.`);
+          } else {
+            throw new Error(`Movies service error (${r.status}). Please check your configuration.`);
+          }
+        }
+        
+        const j = await r.json();
+        const batch = j.items || [];
+        out.push(...batch);
+        if (batch.length < PAGE_SIZE) break;
+        start += PAGE_SIZE;
+        if (start > 50000) break; // safety guard
+      } catch (error) {
+        if (error.message.includes('fetch')) {
+          throw new Error('Unable to connect to movies service. Please check network connectivity.');
+        }
+        throw error;
+      }
     }
+    
+    if (out.length === 0) {
+      throw new Error('No movies found in the specified Plex section. Please check your library.');
+    }
+    
     return out;
   }
 
@@ -154,8 +198,7 @@
       startRotation(cfg, items);
     }catch(e){
       console.error(e);
-      // Silent black screen; for quick debug you can inject a simple message:
-      // document.body.innerHTML = `<pre style="color:#ccc">${String(e)}</pre>`;
+      showError(e.message || 'An unexpected error occurred. Please check the console for details.');
     }
   })();
 })();

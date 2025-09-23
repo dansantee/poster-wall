@@ -1,0 +1,8 @@
+{
+  "plexInsecure": true,
+  "plexToken": "R9TBSeRe-g6yWqtj5p2s",
+  "plexUrl": "http://192.168.1.3:32400",
+  "sectionId": "1",
+  "rotateSec": 3,
+  "autoDim": true
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, requests, urllib3
+import os, json, pathlib, requests, urllib3, subprocess
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
@@ -228,6 +228,30 @@ def poster():
             'Cache-Control': 'public, max-age=86400'
         }
     )
+
+# ---- Restart kiosk service ----
+@app.route("/api/restart-kiosk", methods=["POST", "OPTIONS"])
+def restart_kiosk():
+    if request.method == "OPTIONS": return ("", 204)
+    if ADMIN_KEY and request.headers.get("X-Admin-Key","") != ADMIN_KEY:
+        return jsonify({"error":"forbidden"}), 403
+    
+    try:
+        # Run the systemctl command
+        result = subprocess.run(
+            ["systemctl", "--user", "restart", "poster-kiosk.service"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            return jsonify({"ok": True, "message": "Kiosk service restart initiated"})
+        else:
+            return jsonify({"error": f"Command failed: {result.stderr}"}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Restart command timed out"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to restart kiosk: {str(e)}"}), 500
 
 # ---- Debug (optional) ----
 @app.route('/debug/routes')
