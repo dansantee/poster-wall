@@ -232,6 +232,133 @@ def poster():
         }
     )
 
+# ---- Now Playing (check monitored devices) ----
+@app.route('/api/now-playing', methods=['GET','OPTIONS'])
+def now_playing():
+    if request.method == 'OPTIONS': return ('',204)
+    
+    srv = load_cfg()
+    devices = srv.get('plexDevices', [])
+    
+    if not devices:
+        return jsonify({"playing": False, "message": "No devices configured"})
+    
+    token = token_from(request)
+    if not token:
+        return jsonify({"error": "PLEX_TOKEN not configured"}), 400
+    
+    try:
+        base = resolve_base(request)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    
+    verify_tls = not insecure_from(request)
+    if not verify_tls:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    # Check Plex sessions for any of the monitored devices
+    sessions_url = f"{base}/status/sessions"
+    try:
+        r = requests.get(sessions_url, params={'X-Plex-Token': token}, 
+                        headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
+        if not r.ok:
+            return jsonify({"playing": False, "error": f"Sessions request failed: {r.status_code}"})
+        
+        sessions_data = r.json()
+        sessions = sessions_data.get('MediaContainer', {}).get('Metadata', [])
+        
+        # Look for active sessions on monitored devices
+        for session in sessions:
+            player = session.get('Player', {})
+            player_address = player.get('address', '')
+            player_title = player.get('title', '').lower()
+            
+            # Check if this session is from one of our monitored devices
+            device_match = False
+            for device in devices:
+                device = device.lower().strip()
+                if (device in player_address.lower() or 
+                    device in player_title or
+                    player_address.lower() in device):
+                    device_match = True
+                    break
+            
+            if not device_match:
+                continue
+            
+            # Extract media information
+            media_type = session.get('type')
+            if media_type not in ['movie', 'episode']:
+                continue  # Skip music, photos, etc.
+            
+            # Get detailed media info
+            title = session.get('title', 'Unknown Title')
+            if media_type == 'episode':
+                show_title = session.get('grandparentTitle', '')
+                season_episode = f"S{session.get('parentIndex', '?')}E{session.get('index', '?')}"
+                title = f"{show_title} - {season_episode} - {title}"
+            
+            year = session.get('year')
+            rating = session.get('contentRating', '')
+            duration = int(session.get('duration', 0))  # milliseconds
+            view_offset = int(session.get('viewOffset', 0))  # milliseconds
+            
+            # Get poster
+            thumb = session.get('thumb') or session.get('grandparentThumb')
+            poster_url = None
+            if thumb:
+                insecure_q = '1' if not verify_tls else '0'
+                poster_url = (
+                    f"/api/poster?base={quote_plus(base)}&thumb={quote_plus(thumb)}"
+                    f"&token={quote_plus(token)}&w=1200&h=1800&insecure={insecure_q}"
+                )
+            
+            # Get media streams for audio/video info
+            media_info = session.get('Media', [{}])[0]
+            video_resolution = media_info.get('videoResolution', '')
+            video_codec = media_info.get('videoCodec', '')
+            
+            # Get audio info from first audio stream
+            audio_codec = ''
+            audio_channels = ''
+            for part in media_info.get('Part', []):
+                for stream in part.get('Stream', []):
+                    if stream.get('streamType') == 2:  # Audio stream
+                        audio_codec = stream.get('codec', '').upper()
+                        channels = stream.get('channels', 0)
+                        if channels:
+                            audio_channels = f"{channels}.1" if channels > 2 else f"{channels}.0"
+                        break
+                if audio_codec:
+                    break
+            
+            # Calculate progress percentage
+            progress = 0
+            if duration > 0:
+                progress = min(100, max(0, (view_offset / duration) * 100))
+            
+            return jsonify({
+                "playing": True,
+                "title": title,
+                "year": year,
+                "rating": rating,
+                "poster": poster_url,
+                "progress": round(progress, 1),
+                "duration": duration,
+                "viewOffset": view_offset,
+                "videoResolution": video_resolution,
+                "videoCodec": video_codec.upper(),
+                "audioCodec": audio_codec,
+                "audioChannels": audio_channels,
+                "playerTitle": player.get('title', ''),
+                "mediaType": media_type
+            })
+        
+        return jsonify({"playing": False, "message": "No active sessions on monitored devices"})
+        
+    except Exception as e:
+        return jsonify({"playing": False, "error": f"Sessions check failed: {str(e)}"})
+
 # ---- Restart kiosk service ----
 @app.route("/api/restart-kiosk", methods=["POST", "OPTIONS"])
 def restart_kiosk():

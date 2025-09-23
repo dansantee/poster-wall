@@ -1,12 +1,13 @@
 {
+  "autoDim": true,
   "hostname": "Dan-Desktop",
-  "sectionId": "1",
-  "rotateSec": 10,
-  "autoDim": false,
-  "plexUrl": "",
-  "plexToken": "",
-  "plexInsecure": true,
   "plexDevices": [
     "192.168.1.92"
-  ]
+  ],
+  "plexInsecure": true,
+  "plexToken": "R9TBSeRe-g6yWqtj5p2s",
+  "plexUrl": "http://192.168.1.3:32400",
+  "rotateSec": 10,
+  "sectionId": "1",
+  "nowShowingText": "NOW SHOWING"
 }

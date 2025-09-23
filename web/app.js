@@ -41,13 +41,15 @@
     
     // Always return the config with hostname
     return {
-      sectionId:   j.sectionId   ?? '1',
-      rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
-      plexUrl:     j.plexUrl     ?? '',
-      plexToken:   j.plexToken   ?? '',
-      plexInsecure:!!j.plexInsecure,
-      autoDim:     !!j.autoDim,
-      hostname:    j.hostname    ?? '<hostname>'
+      sectionId:     j.sectionId     ?? '1',
+      rotateSec:     Math.max(3, Number(j.rotateSec) || 10),
+      plexUrl:       j.plexUrl       ?? '',
+      plexToken:     j.plexToken     ?? '',
+      plexInsecure:  !!j.plexInsecure,
+      autoDim:       !!j.autoDim,
+      hostname:      j.hostname      ?? '<hostname>',
+      nowShowingText:j.nowShowingText?? 'NOW SHOWING',
+      plexDevices:   j.plexDevices   ?? []
     };
   }
 
@@ -180,8 +182,107 @@
     }).catch(()=>{/* ignore a single failed image */});
   }
 
+  // ---- now playing functionality ----
+  let rotationInterval = null;
+  let nowPlayingInterval = null;
+  let currentMode = 'rotation'; // 'rotation' or 'nowplaying'
+
+  async function checkNowPlaying(cfg) {
+    if (!cfg.plexDevices || cfg.plexDevices.length === 0) {
+      return { playing: false };
+    }
+
+    try {
+      const h = headers(cfg);
+      const r = await fetch(`${proxyBase()}/api/now-playing`, { 
+        cache: 'no-store', 
+        headers: h 
+      });
+      
+      if (!r.ok) {
+        console.warn('Now playing check failed:', r.status);
+        return { playing: false };
+      }
+      
+      return await r.json();
+    } catch (error) {
+      console.warn('Now playing error:', error);
+      return { playing: false };
+    }
+  }
+
+  function showNowPlaying(data, cfg) {
+    const stage = document.getElementById('stage');
+    const nowShowing = document.getElementById('nowShowing');
+    
+    if (!nowShowing) return;
+
+    // Hide rotation display
+    stage.style.display = 'none';
+    
+    // Update now showing content
+    const titleEl = document.getElementById('nowShowingTitle');
+    const progressBar = document.getElementById('nowShowingProgressBar');
+    const poster = document.getElementById('nowShowingPoster');
+    const movieTitle = document.getElementById('nowShowingMovieTitle');
+    const videoInfo = document.getElementById('nowShowingVideoInfo');
+    const audioInfo = document.getElementById('nowShowingAudioInfo');
+    const rating = document.getElementById('nowShowingRating');
+
+    if (titleEl) titleEl.textContent = cfg.nowShowingText;
+    if (progressBar) progressBar.style.width = `${data.progress || 0}%`;
+    if (poster && data.poster) poster.src = prox(data.poster);
+    if (movieTitle) movieTitle.textContent = data.title || 'Unknown Title';
+    
+    // Format video info
+    let videoText = '';
+    if (data.videoResolution && data.videoCodec) {
+      videoText = `${data.videoResolution.toUpperCase()} ${data.videoCodec}`;
+    } else if (data.videoResolution) {
+      videoText = data.videoResolution.toUpperCase();
+    } else if (data.videoCodec) {
+      videoText = data.videoCodec;
+    } else {
+      videoText = '-';
+    }
+    if (videoInfo) videoInfo.textContent = videoText;
+
+    // Format audio info
+    let audioText = '';
+    if (data.audioCodec && data.audioChannels) {
+      audioText = `${data.audioCodec} ${data.audioChannels}`;
+    } else if (data.audioCodec) {
+      audioText = data.audioCodec;
+    } else {
+      audioText = '-';
+    }
+    if (audioInfo) audioInfo.textContent = audioText;
+
+    if (rating) rating.textContent = data.rating || '-';
+
+    // Show now playing screen
+    nowShowing.classList.add('visible');
+    currentMode = 'nowplaying';
+  }
+
+  function showRotation() {
+    const stage = document.getElementById('stage');
+    const nowShowing = document.getElementById('nowShowing');
+    
+    if (nowShowing) nowShowing.classList.remove('visible');
+    if (stage) stage.style.display = 'block';
+    currentMode = 'rotation';
+  }
+
   function startRotation(cfg, list){
     if (!list.length) return;
+    
+    // Clear any existing rotation
+    if (rotationInterval) {
+      clearInterval(rotationInterval);
+      rotationInterval = null;
+    }
+
     // shuffle
     for (let i=list.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
     let idx = 0;
@@ -194,10 +295,43 @@
       front.classList.add('visible');
     });
 
-    setInterval(()=>{
+    rotationInterval = setInterval(()=>{
       const item = list[idx++ % list.length];
       swap(cfg, item.poster);
     }, cfg.rotateSec * 1000);
+  }
+
+  function startNowPlayingMonitor(cfg) {
+    // Clear any existing monitor
+    if (nowPlayingInterval) {
+      clearInterval(nowPlayingInterval);
+      nowPlayingInterval = null;
+    }
+
+    // Check every 5 seconds for now playing status
+    nowPlayingInterval = setInterval(async () => {
+      const nowPlayingData = await checkNowPlaying(cfg);
+      
+      if (nowPlayingData.playing && currentMode === 'rotation') {
+        showNowPlaying(nowPlayingData, cfg);
+      } else if (!nowPlayingData.playing && currentMode === 'nowplaying') {
+        showRotation();
+      } else if (nowPlayingData.playing && currentMode === 'nowplaying') {
+        // Update progress bar if still playing
+        const progressBar = document.getElementById('nowShowingProgressBar');
+        if (progressBar) {
+          progressBar.style.width = `${nowPlayingData.progress || 0}%`;
+        }
+      }
+    }, 5000);
+
+    // Initial check
+    setTimeout(async () => {
+      const nowPlayingData = await checkNowPlaying(cfg);
+      if (nowPlayingData.playing) {
+        showNowPlaying(nowPlayingData, cfg);
+      }
+    }, 1000);
   }
 
   // ---- boot ----
@@ -205,7 +339,14 @@
     try{
       const cfg = await loadCfg();
       const items = await fetchItems(cfg);
+      
+      // Start poster rotation
       startRotation(cfg, items);
+      
+      // Start now playing monitoring if devices are configured
+      if (cfg.plexDevices && cfg.plexDevices.length > 0) {
+        startNowPlayingMonitor(cfg);
+      }
     }catch(e){
       console.error(e);
       // Try to get hostname from config if we managed to load it
