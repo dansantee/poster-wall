@@ -14,7 +14,49 @@
 
   // Display error message to user
   function showError(message) {
-    document.body.innerHTML = `<div style="color: #ff6b6b; font-family: monospace; font-size: 18px; text-align: center; padding: 50px; background: #000;">${message}</div>`;
+    const settingsUrl = `http://${location.hostname}:8088/settings.html`;
+    document.body.innerHTML = `
+      <div style="
+        color: #ff6b6b; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        font-size: 48px; 
+        font-weight: 300;
+        text-align: center; 
+        padding: 80px 60px; 
+        background: #000; 
+        line-height: 1.4;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      ">
+        <div style="margin-bottom: 60px; max-width: 80%;">
+          ${message}
+        </div>
+        <div style="
+          font-size: 32px; 
+          color: #888; 
+          margin-top: 40px;
+          padding: 30px;
+          border: 2px solid #333;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.05);
+        ">
+          <div style="color: #ccc; margin-bottom: 20px; font-size: 28px;">
+            Configure settings at:
+          </div>
+          <div style="
+            color: #4a9eff; 
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            word-break: break-all;
+          ">
+            ${settingsUrl}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   async function loadCfg(){
