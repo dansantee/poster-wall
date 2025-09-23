@@ -1,45 +1,71 @@
 #!/usr/bin/env bash
 # setup.sh
 # One-shot installer for the "poster-wall" Raspberry Pi kiosk (Pi 5, OS Lite).
-# - Installs minimal deps (Wayland cage, Python venv)
-# - Creates user systemd services (proxy, web)
+# - Installs minimal deps (Sway compositor, Chromium, Python venv)
+# - Creates user systemd services (proxy, web, kiosk)
 # - Enables seatd for GPU/DRM access, adds user to required groups
 # - Applies safe boot tweaks (no screen blanking, GPU mem, fbcon rotation)
 # - Starts services immediately and enables at boot
 #
-# Usage: run from repo root that contains ./proxy and ./web
+# Usage (from repo root containing ./proxy and ./web):
 #   chmod +x setup.sh
-#   ./setup.sh --rotate 1
+#   ./setup.sh --rotate 90
 #
 # Re-run any time; it's idempotent.
 
 set -euo pipefail
 
 # -------- CLI args --------
-FBCON_ROTATE=1   # default 90° clockwise
+# --rotate <deg> controls BOTH:
+#   - fbcon rotation (as rotate:N where N = deg/90 mod 4)
+#   - sway output transform (deg)
+ROTATE_DEG=90   # default 90° (portrait)
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --rotate)
       shift
       if [[ $# -gt 0 ]]; then
-        FBCON_ROTATE="$1"
-        shift
+        ROTATE_DEG="$1"; shift
       else
-        echo "Error: --rotate requires a value (0|1|2|3)"
+        echo "Error: --rotate requires a value (0|90|180|270)"
         exit 1
       fi
       ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 [--rotate 0|1|2|3]"
+      echo "Usage: $0 [--rotate 0|90|180|270]"
       exit 1
       ;;
   esac
 done
 
+# Normalize ROTATE_DEG to 0,90,180,270
+norm=$(( (ROTATE_DEG % 360 + 360) % 360 ))
+case "$norm" in
+  0|90|180|270) SWAY_ROTATE_DEG="$norm" ;;
+  *)
+    echo "Error: --rotate must be 0, 90, 180, or 270"
+    exit 1
+    ;;
+esac
+# fbcon rotate index (0..3)
+FBCON_ROTATE=$(( SWAY_ROTATE_DEG / 90 ))
+
 # -------- Config --------
 WEB_PORT="8088"
 PROXY_PORT="8811"
+
+# Chromium flags (Wayland + kiosk, lean)
+CHROMIUM_FLAGS=(
+  "--kiosk"
+  "--noerrdialogs"
+  "--disable-infobars"
+  "--disable-session-crashed-bubble"
+  "--check-for-update-interval=31536000"
+  "--ozone-platform=wayland"
+  "--autoplay-policy=no-user-gesture-required"
+  "--password-store=basic"
+)
 
 # -------- Derived paths --------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,11 +81,12 @@ WEB_DIR="$REPO_DIR/web"
 
 PROXY_SERVICE="$SYSTEMD_USER_DIR/poster-proxy.service"
 WEB_SERVICE="$SYSTEMD_USER_DIR/poster-web.service"
+KIOSK_SERVICE="$SYSTEMD_USER_DIR/poster-kiosk.service"
 
 SEATD_SERVICE="seatd.service"
 
 # -------- Sanity checks --------
-echo "==> Poster Wall Installer (no Chromium)"
+echo "==> Poster Wall Installer (Sway kiosk)"
 
 if [[ ! -d "$PROXY_DIR" || ! -d "$WEB_DIR" ]]; then
   echo "ERROR: Expected ./proxy and ./web subfolders in repo root: $REPO_DIR"
@@ -78,11 +105,27 @@ echo "==> Installing packages (sudo required)..."
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
 
+# Chromium package name differs across builds; try both.
+if ! command -v chromium-browser >/dev/null 2>&1 && ! command -v chromium >/dev/null 2>&1; then
+  sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+fi
+
 sudo apt-get install -y \
   python3-venv python3-pip \
-  cage \
+  sway wayland-protocols \
   fonts-dejavu fonts-liberation \
   seatd
+
+# -------- Choose Chromium path --------
+if command -v chromium-browser >/dev/null 2>&1; then
+  BROWSER_BIN="$(command -v chromium-browser)"
+elif command -v chromium >/dev/null 2>&1; then
+  BROWSER_BIN="$(command -v chromium)"
+else
+  echo "ERROR: Chromium not found after install."
+  exit 1
+fi
+echo "Chromium: $BROWSER_BIN"
 
 # -------- Groups & seatd --------
 echo "==> Ensuring user is in video/render/input groups (for DRM/input access)..."
@@ -96,7 +139,7 @@ for g in video render input; do
 done
 
 echo "==> Enabling seatd (DRM broker) ..."
-sudo systemctl enable --now "$SEATD_SERVICE" >/dev/null || true
+sudo systemctl enable --now "$SEATD_SERVICE" >/dev/null 2>&1 || true
 
 # -------- Python venv & deps --------
 echo "==> Setting up Python venv..."
@@ -122,8 +165,6 @@ ExecStart=$VENV_DIR/bin/python $PROXY_DIR/app.py
 WorkingDirectory=$PROXY_DIR
 Restart=on-failure
 Environment=PYTHONUNBUFFERED=1
-# Optionally pass PORT to your app if it supports env config:
-# Environment=PORT=$PROXY_PORT
 
 [Install]
 WantedBy=default.target
@@ -144,45 +185,94 @@ Restart=on-failure
 WantedBy=default.target
 EOF
 
+# Kiosk (Sway + Chromium)
+mkdir -p "$USER_HOME/.config/sway"
+cat >"$USER_HOME/.config/sway/config" <<EOF
+# Poster Wall Kiosk (Sway)
+
+# Rotate HDMI output to match CLI flag
+output HDMI-A-1 transform $SWAY_ROTATE_DEG
+
+# Hide the pointer immediately (compositor-level)
+seat * hide_cursor 1
+
+# Launch Chromium fullscreen to the local site
+exec $BROWSER_BIN ${CHROMIUM_FLAGS[*]} http://localhost:$WEB_PORT
+EOF
+
+cat >"$KIOSK_SERVICE" <<EOF
+[Unit]
+Description=Poster Wall Kiosk (Sway + Chromium)
+After=network-online.target poster-web.service
+Wants=poster-web.service
+
+[Service]
+Type=simple
+Environment=XDG_RUNTIME_DIR=%t
+ExecStart=/usr/bin/sway -c %h/.config/sway/config
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+
 # -------- Enable lingering & start services --------
 echo "==> Enabling user lingering so services run at boot..."
 sudo loginctl enable-linger "$USER_NAME" >/dev/null || true
 
 echo "==> Reloading user systemd, enabling & starting services..."
 systemctl --user daemon-reload
-systemctl --user enable poster-proxy.service poster-web.service >/dev/null
-systemctl --user restart poster-proxy.service poster-web.service
+systemctl --user enable poster-proxy.service poster-web.service poster-kiosk.service >/dev/null
+systemctl --user restart poster-proxy.service poster-web.service poster-kiosk.service
 
 # -------- Boot/file tweaks --------
 BOOT_FW="/boot/firmware"
 CMDLINE="$BOOT_FW/cmdline.txt"
 CONFIGTXT="$BOOT_FW/config.txt"
 
-if [[ -w "$CMDLINE" && -w "$CONFIGTXT" ]]; then
+# Use -e (exists) instead of -w (writable), always write with sudo
+if [[ -e "$CMDLINE" && -e "$CONFIGTXT" ]]; then
   echo "==> Applying boot tweaks (consoleblank=0, gpu_mem=256, hdmi_force_hotplug=1, fbcon=rotate:$FBCON_ROTATE)..."
+
+  # Ensure consoleblank=0 present
   if ! grep -qw "consoleblank=0" "$CMDLINE"; then
     sudo cp "$CMDLINE" "$CMDLINE.bak.$(date +%s)"
     sudo sed -i 's/$/ consoleblank=0/' "$CMDLINE"
   fi
+
+  # Ensure gpu_mem and hdmi_force_hotplug in config.txt
   sudo cp "$CONFIGTXT" "$CONFIGTXT.bak.$(date +%s)"
   grep -q "^gpu_mem=" "$CONFIGTXT" || echo "gpu_mem=256" | sudo tee -a "$CONFIGTXT" >/dev/null
   grep -q "^hdmi_force_hotplug=" "$CONFIGTXT" || echo "hdmi_force_hotplug=1" | sudo tee -a "$CONFIGTXT" >/dev/null
-  if ! grep -qw "fbcon=rotate:$FBCON_ROTATE" "$CMDLINE"; then
-    sudo cp "$CMDLINE" "$CMDLINE.bak.$(date +%s)"
-    sudo sed -i "s/\$/ fbcon=rotate:$FBCON_ROTATE/" "$CMDLINE"
-  fi
+
+  # --- fbcon rotation (ensure exactly one entry) ---
+  desired="fbcon=rotate:$FBCON_ROTATE"
+  sudo cp "$CMDLINE" "$CMDLINE.bak.$(date +%s)"
+  current="$(sudo cat "$CMDLINE")"
+  cleaned="$(printf '%s\n' "$current" \
+    | sed -E 's/(^| )fbcon=rotate:[0-3]( |$)/ /g' \
+    | tr -s ' ' \
+    | sed 's/[[:space:]]$//')"
+  printf '%s %s\n' "$cleaned" "$desired" | sudo tee "$CMDLINE" >/dev/null
+
 else
-  echo "WARN: Cannot edit $CMDLINE / $CONFIGTXT. Skipping boot tweaks."
+  echo "WARN: Cannot find $CMDLINE or $CONFIGTXT. Skipping boot tweaks."
 fi
 
 # -------- Finish --------
 echo
-echo "✅ Poster Wall backend services are running."
+echo "✅ Poster Wall kiosk (Sway + Chromium) is running."
 echo "   - Web:      http://localhost:$WEB_PORT"
+echo "   - Rotation: Sway ${SWAY_ROTATE_DEG}°, fbcon rotate:${FBCON_ROTATE}"
 echo
 echo "Useful commands:"
 echo "  systemctl --user status poster-proxy.service"
 echo "  systemctl --user status poster-web.service"
+echo "  systemctl --user status poster-kiosk.service"
+echo "  journalctl --user -u poster-kiosk.service -e -f"
 echo
 if $NEED_RELOGIN; then
   echo "NOTE: You were added to video/render/input groups. A reboot is recommended."
