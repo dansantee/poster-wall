@@ -56,7 +56,7 @@ Run the setup script:
 
 ```bash
 chmod +x setup.sh
-./setup.sh --fbcon-rotate 1 --session-rotate auto --cursor hide
+./setup.sh --rotate 1
 ```
 
 ## Kiosk / Plex configuration
