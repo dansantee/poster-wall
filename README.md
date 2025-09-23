@@ -56,7 +56,7 @@ Run the setup script:
 
 ```bash
 chmod +x setup.sh
-./setup.sh --rotate 1
+./setup.sh --rotate 90
 ```
 
 ## Kiosk / Plex configuration
