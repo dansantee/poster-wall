@@ -75,7 +75,7 @@ def insecure_from(req):
 @app.after_request
 def add_cors(resp):
     resp.headers['Access-Control-Allow-Origin']  = '*'
-    resp.headers['Access-Control-Allow-Methods'] = 'GET, PUT, OPTIONS'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, PUT, POST, OPTIONS'
     resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Plex-Token, X-Plex-Url, X-Allow-Insecure, X-Admin-Key'
     return resp
 
