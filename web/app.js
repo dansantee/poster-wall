@@ -39,8 +39,8 @@
     }
     const j = await r.json();
     
-    // Check if config has required fields for operation (but always return the config with hostname)
-    const config = {
+    // Always return the config with hostname
+    return {
       sectionId:   j.sectionId   ?? '1',
       rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
       plexUrl:     j.plexUrl     ?? '',
@@ -49,14 +49,6 @@
       autoDim:     !!j.autoDim,
       hostname:    j.hostname    ?? '<hostname>'
     };
-    
-    if (!config.plexUrl || !config.plexToken) {
-      const error = new Error('Plex configuration incomplete. Please check your Plex URL and token on the settings page.');
-      error.config = config; // attach config so we can get hostname
-      throw error;
-    }
-    
-    return config;
   }
 
   function headers(cfg){
@@ -96,6 +88,10 @@
           } else if (r.status === 404) {
             throw new Error(`Plex section ${cfg.sectionId} not found. Please check your section ID.`);
           } else if (r.status >= 500) {
+            // Check if this might be due to incomplete config
+            if (!cfg.plexUrl || !cfg.plexToken) {
+              throw new Error('Plex configuration incomplete. Please check your Plex URL and token on the settings page.');
+            }
             throw new Error(`Plex server error (${r.status}). Please check your Plex server.`);
           } else {
             throw new Error(`Movies service error (${r.status}). Please check your configuration.`);
@@ -210,8 +206,17 @@
       startRotation(cfg, items);
     }catch(e){
       console.error(e);
-      // If we have config attached to error (incomplete config), use its hostname
-      const hostname = e.config?.hostname || 'poster-wall.local';
+      // Try to get hostname from config if we managed to load it
+      let hostname = 'poster-wall.local';
+      try {
+        const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          hostname = j.hostname || hostname;
+        }
+      } catch (configError) {
+        // Use fallback hostname
+      }
       showError(e.message || 'An unexpected error occurred. Please check the console for details.', hostname);
     }
   })();
