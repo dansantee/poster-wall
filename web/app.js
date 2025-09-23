@@ -33,33 +33,30 @@
   }
 
   async function loadCfg(){
-    try {
-      const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
-      if (!r.ok) {
-        throw new Error(`Configuration service unavailable (${r.status}). Please check if the proxy server is running on port 8811.`);
-      }
-      const j = await r.json();
-      
-      // Check if config has required fields
-      if (!j.plexUrl || !j.plexToken) {
-        throw new Error('Configuration incomplete. Please ensure Plex URL and token are configured.');
-      }
-      
-      // Normalize sensible defaults in case fields are missing
-      return {
-        sectionId:   j.sectionId   ?? '1',
-        rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
-        plexUrl:     j.plexUrl     ?? '',
-        plexToken:   j.plexToken   ?? '',
-        plexInsecure:!!j.plexInsecure,
-        autoDim:     !!j.autoDim
-      };
-    } catch (error) {
-      if (error.message.includes('fetch')) {
-        throw new Error('Unable to connect to configuration service. Please ensure the proxy server is running.');
-      }
+    const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
+    if (!r.ok) {
+      throw new Error(`Configuration service unavailable (${r.status}). Please check if the proxy server is running on port 8811.`);
+    }
+    const j = await r.json();
+    
+    // Check if config has required fields for operation (but always return the config with hostname)
+    const config = {
+      sectionId:   j.sectionId   ?? '1',
+      rotateSec:   Math.max(3, Number(j.rotateSec) || 10),
+      plexUrl:     j.plexUrl     ?? '',
+      plexToken:   j.plexToken   ?? '',
+      plexInsecure:!!j.plexInsecure,
+      autoDim:     !!j.autoDim,
+      hostname:    j.hostname    ?? '<hostname>'
+    };
+    
+    if (!config.plexUrl || !config.plexToken) {
+      const error = new Error('Configuration incomplete. Please ensure Plex URL and token are configured.');
+      error.config = config; // attach config so we can get hostname
       throw error;
     }
+    
+    return config;
   }
 
   function headers(cfg){
@@ -207,14 +204,14 @@
 
   // ---- boot ----
   (async function init(){
-    let hostname = 'poster-wall.local'; // fallback
     try{
       const cfg = await loadCfg();
-      hostname = cfg.hostname || hostname; // use actual hostname if available
       const items = await fetchItems(cfg);
       startRotation(cfg, items);
     }catch(e){
       console.error(e);
+      // If we have config attached to error (incomplete config), use its hostname
+      const hostname = e.config?.hostname || 'poster-wall.local';
       showError(e.message || 'An unexpected error occurred. Please check the console for details.', hostname);
     }
   })();

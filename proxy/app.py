@@ -89,8 +89,8 @@ def ping():
 @app.route("/api/config", methods=["GET", "OPTIONS"])
 def cfg_get():
     if request.method == "OPTIONS": return ("", 204)
-    config = load_cfg()
-    # Add hostname to config for client use
+    config = load_cfg() or {}  # Ensure we always have a dict
+    # Always add hostname to config for client use
     config['hostname'] = socket.gethostname()
     return jsonify(config)
 

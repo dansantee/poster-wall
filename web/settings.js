@@ -34,7 +34,7 @@
       if (has('rotateSec'))   el('rotateSec').value    = cfg.rotateSec ?? 10;
       if (has('plexUrl'))     el('plexUrl').value      = cfg.plexUrl   ?? '';
       if (has('plexToken'))   el('plexToken').value    = cfg.plexToken ?? '';
-      if (has('plexInsecure'))el('plexInsecure').checked = !!cfg.plexInsecure;
+      if (has('plexInsecure'))el('plexInsecure').checked = cfg.plexInsecure ?? true;
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
