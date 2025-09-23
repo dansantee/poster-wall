@@ -76,8 +76,6 @@
     // Restart button
     if (has('btnRestart')) {
       el('btnRestart').addEventListener('click', async () => {
-        if (!confirm('Restart the kiosk service? The display will reload.')) return;
-        
         try {
           const headers = { 'Content-Type': 'application/json' };
           const key = has('adminKey') ? (el('adminKey').value || '').trim() : '';
@@ -87,9 +85,7 @@
             method: 'POST', headers
           });
           
-          if (r.ok) {
-            alert('Kiosk restart initiated.');
-          } else {
+          if (!r.ok) {
             const err = await r.text();
             alert(`Restart failed: ${err}`);
           }
