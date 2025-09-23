@@ -13,45 +13,18 @@
   function proxyBase(){ return `${location.protocol}//${location.hostname}:8811`; }
 
   // Display error message to user
-  function showError(message) {
-    const settingsUrl = `http://${location.hostname}:8088/settings.html`;
+  function showError(message, hostname = 'poster-wall.local') {
+    const settingsUrl = `http://${hostname}:8088/settings.html`;
     document.body.innerHTML = `
-      <div style="
-        color: #ff6b6b; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-        font-size: 48px; 
-        font-weight: 300;
-        text-align: center; 
-        padding: 80px 60px; 
-        background: #000; 
-        line-height: 1.4;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      ">
-        <div style="margin-bottom: 60px; max-width: 80%;">
+      <div class="error-container">
+        <div class="error-message">
           ${message}
         </div>
-        <div style="
-          font-size: 32px; 
-          color: #888; 
-          margin-top: 40px;
-          padding: 30px;
-          border: 2px solid #333;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.05);
-        ">
-          <div style="color: #ccc; margin-bottom: 20px; font-size: 28px;">
+        <div class="error-settings">
+          <div class="error-settings-label">
             Configure settings at:
           </div>
-          <div style="
-            color: #4a9eff; 
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            word-break: break-all;
-          ">
+          <div class="error-settings-url">
             ${settingsUrl}
           </div>
         </div>
@@ -234,13 +207,15 @@
 
   // ---- boot ----
   (async function init(){
+    let hostname = 'poster-wall.local'; // fallback
     try{
       const cfg = await loadCfg();
+      hostname = cfg.hostname || hostname; // use actual hostname if available
       const items = await fetchItems(cfg);
       startRotation(cfg, items);
     }catch(e){
       console.error(e);
-      showError(e.message || 'An unexpected error occurred. Please check the console for details.');
+      showError(e.message || 'An unexpected error occurred. Please check the console for details.', hostname);
     }
   })();
 })();

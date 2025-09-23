@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, requests, urllib3, subprocess
+import os, json, pathlib, requests, urllib3, subprocess, socket
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
@@ -89,7 +89,10 @@ def ping():
 @app.route("/api/config", methods=["GET", "OPTIONS"])
 def cfg_get():
     if request.method == "OPTIONS": return ("", 204)
-    return jsonify(load_cfg())
+    config = load_cfg()
+    # Add hostname to config for client use
+    config['hostname'] = socket.gethostname()
+    return jsonify(config)
 
 @app.route("/api/config", methods=["PUT", "OPTIONS"])
 def cfg_put():
