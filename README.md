@@ -1,6 +1,6 @@
 # poster-wall
 
-A simple Raspberry Pi kiosk for displaying posters and media (used with Plex in this project).
+A Raspberry Pi kiosk for displaying Plex posters and media.
 
 ## Requirements
 
