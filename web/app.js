@@ -55,6 +55,7 @@
       nowShowingFontWeight:j.nowShowingFontWeight?? 700,
       nowShowingColor:j.nowShowingColor?? '#F4E88A',
       progressBarColor:j.progressBarColor?? '#F4E88A',
+      progressBarPadding:j.progressBarPadding?? 1.5,
       plexDevices:   j.plexDevices   ?? []
     };
   }
@@ -232,6 +233,9 @@
     }
     if (cfg.progressBarColor) {
       root.style.setProperty('--progress-bar-color', cfg.progressBarColor);
+    }
+    if (cfg.progressBarPadding !== undefined) {
+      root.style.setProperty('--progress-bar-padding', `${cfg.progressBarPadding}vh`);
     }
   }
 

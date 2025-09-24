@@ -44,6 +44,7 @@
       if (has('nowShowingFontWeight')) el('nowShowingFontWeight').value = cfg.nowShowingFontWeight ?? 700;
       if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
       if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
+      if (has('progressBarPadding')) el('progressBarPadding').value = cfg.progressBarPadding ?? 1.5;
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
@@ -72,6 +73,7 @@
           if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
           if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
           if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+          if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
           if (has('plexUrl')) {
             let u = (el('plexUrl').value || '').trim();
             if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -133,6 +135,7 @@
         if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
         if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
         if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+        if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
