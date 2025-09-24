@@ -54,6 +54,8 @@
       if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
       if (has('progressBarPadding')) el('progressBarPadding').value = cfg.progressBarPadding ?? 1.5;
       if (has('progressBarHeight')) el('progressBarHeight').value = cfg.progressBarHeight ?? 2.5;
+      if (has('posterTransitions')) el('posterTransitions').checked = !!cfg.posterTransitions;
+      if (has('transitionType')) el('transitionType').value = cfg.transitionType ?? 'crossfade';
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
@@ -89,6 +91,8 @@
           if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
           if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
           if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
+          if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
+          if (has('transitionType')) next.transitionType = el('transitionType').value || 'crossfade';
           if (has('plexUrl')) {
             let u = (el('plexUrl').value || '').trim();
             if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -157,6 +161,8 @@
         if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
         if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
         if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
+        if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
+        if (has('transitionType')) next.transitionType = el('transitionType').value || 'crossfade';
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize

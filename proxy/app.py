@@ -111,6 +111,11 @@ def cfg_get():
     config = load_cfg() or {}  # Ensure we always have a dict
     # Always add hostname to config for client use
     config['hostname'] = socket.gethostname()
+    
+    # Add default transition settings if not present
+    config.setdefault('posterTransitions', False)
+    config.setdefault('transitionType', 'crossfade')
+    
     return jsonify(config)
 
 @app.route("/api/config", methods=["PUT", "OPTIONS"])

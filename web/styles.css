@@ -97,6 +97,166 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   opacity: 1;
 }
 
+/* GPU-optimized transition effects for Raspberry Pi 5 */
+/* Slide transitions - hardware accelerated transforms */
+.poster.transition-slide-left {
+  transition: transform 800ms ease, opacity 600ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.poster.transition-slide-left.entering {
+  transform: translateX(-100vw);
+  opacity: 1;
+}
+
+.poster.transition-slide-left.visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.poster.transition-slide-left.exiting {
+  transform: translateX(100vw);
+  opacity: 0;
+}
+
+.poster.transition-slide-right {
+  transition: transform 800ms ease, opacity 600ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.poster.transition-slide-right.entering {
+  transform: translateX(100vw);
+  opacity: 1;
+}
+
+.poster.transition-slide-right.visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.poster.transition-slide-right.exiting {
+  transform: translateX(-100vw);
+  opacity: 0;
+}
+
+.poster.transition-slide-up {
+  transition: transform 800ms ease, opacity 600ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.poster.transition-slide-up.entering {
+  transform: translateY(100vh);
+  opacity: 1;
+}
+
+.poster.transition-slide-up.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.poster.transition-slide-up.exiting {
+  transform: translateY(-100vh);
+  opacity: 0;
+}
+
+.poster.transition-slide-down {
+  transition: transform 800ms ease, opacity 600ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.poster.transition-slide-down.entering {
+  transform: translateY(-100vh);
+  opacity: 1;
+}
+
+.poster.transition-slide-down.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.poster.transition-slide-down.exiting {
+  transform: translateY(100vh);
+  opacity: 0;
+}
+
+/* 3D Flip transition - GPU accelerated */
+.poster.transition-flip {
+  transition: transform 700ms ease-in-out, opacity 300ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+  transform-style: preserve-3d;
+}
+
+.poster.transition-flip.entering {
+  transform: rotateY(-90deg) scale(0.8);
+  opacity: 0;
+}
+
+.poster.transition-flip.visible {
+  transform: rotateY(0deg) scale(1);
+  opacity: 1;
+}
+
+.poster.transition-flip.exiting {
+  transform: rotateY(90deg) scale(0.8);
+  opacity: 0;
+}
+
+/* Scale and fade - smooth zoom effect */
+.poster.transition-scale-fade {
+  transition: transform 750ms ease, opacity 600ms ease, filter 300ms ease;
+  will-change: transform, opacity, filter;
+}
+
+.poster.transition-scale-fade.entering {
+  transform: scale(0.7);
+  opacity: 0;
+}
+
+.poster.transition-scale-fade.visible {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.poster.transition-scale-fade.exiting {
+  transform: scale(1.3);
+  opacity: 0;
+}
+
+/* Blur transition - cinematic focus effect */
+.poster.transition-blur-transition {
+  transition: filter 600ms ease, opacity 500ms ease;
+  will-change: filter, opacity;
+}
+
+.poster.transition-blur-transition.entering {
+  filter: blur(20px) brightness(1.2);
+  opacity: 0;
+}
+
+.poster.transition-blur-transition.visible {
+  filter: blur(0px) brightness(1);
+  opacity: 1;
+}
+
+.poster.transition-blur-transition.exiting {
+  filter: blur(15px) brightness(0.8);
+  opacity: 0;
+}
+
+/* Crossfade (default) - smooth opacity transition */
+.poster.transition-crossfade {
+  transition: opacity 900ms ease, filter 300ms ease;
+  will-change: opacity, filter;
+}
+
+.poster.transition-crossfade.visible {
+  opacity: 1;
+}
+
+.poster.transition-crossfade.exiting {
+  opacity: 0;
+}
+
 /* Dim very bright posters (toggled by JS) */
 .poster {
   transition: opacity 900ms ease, filter 300ms ease;

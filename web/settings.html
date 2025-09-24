@@ -78,6 +78,23 @@
       <label>Progress Bar Height (vh)
         <input type="number" id="progressBarHeight" value="2.5" min="0.5" max="8" step="0.1" />
       </label>
+      <label class="inline" for="posterTransitions">
+        <span>Enable Poster Transitions</span>
+        <input type="checkbox" id="posterTransitions" />
+      </label>
+      <label>Transition Type
+        <select id="transitionType">
+          <option value="crossfade">Crossfade (Default)</option>
+          <option value="slide-left">Slide Left</option>
+          <option value="slide-right">Slide Right</option>
+          <option value="slide-up">Slide Up</option>
+          <option value="slide-down">Slide Down</option>
+          <option value="flip">3D Flip</option>
+          <option value="scale-fade">Scale & Fade</option>
+          <option value="blur-transition">Blur Transition</option>
+        </select>
+        <small>Choose transition effect between posters. GPU-optimized for Raspberry Pi 5.</small>
+      </label>
       <label class="inline" for="autoDim">
         <span>Auto-dim bright posters</span>
         <input type="checkbox" id="autoDim" />

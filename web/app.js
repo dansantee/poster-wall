@@ -57,6 +57,8 @@
       progressBarColor:j.progressBarColor?? '#F4E88A',
       progressBarPadding:j.progressBarPadding?? 1.5,
       progressBarHeight:j.progressBarHeight?? 2.5,
+      posterTransitions:!!j.posterTransitions,
+      transitionType:j.transitionType?? 'crossfade',
       plexDevices:   j.plexDevices   ?? []
     };
   }
@@ -316,15 +318,63 @@
   }
 
   function swap(cfg, src){
-    back.classList.remove('visible');
+    // Skip transitions if disabled or using default crossfade
+    if (!cfg.posterTransitions || cfg.transitionType === 'crossfade') {
+      // Original crossfade behavior
+      back.classList.remove('visible');
+      const psrc = prox(src);
+      preload(psrc).then(async ()=>{
+        back.src = psrc;
+        await applyDim(back, cfg.autoDim, psrc);
+        requestAnimationFrame(()=>{
+          front.classList.remove('visible');
+          back.classList.add('visible');
+          const t = front; front = back; back = t;
+        });
+      }).catch(()=>{/* ignore a single failed image */});
+      return;
+    }
+
+    // Advanced transitions
+    const transitionClass = `transition-${cfg.transitionType}`;
     const psrc = prox(src);
+    
     preload(psrc).then(async ()=>{
       back.src = psrc;
       await applyDim(back, cfg.autoDim, psrc);
+      
       requestAnimationFrame(()=>{
+        // Clear any existing transition classes
+        front.className = front.className.replace(/transition-\S+/g, '').trim();
+        back.className = back.className.replace(/transition-\S+/g, '').trim();
+        
+        // Add transition class to both elements
+        front.classList.add('poster', transitionClass);
+        back.classList.add('poster', transitionClass);
+        
+        // Start exit transition on front element
         front.classList.remove('visible');
-        back.classList.add('visible');
-        const t = front; front = back; back = t;
+        front.classList.add('exiting');
+        
+        // Start enter transition on back element  
+        back.classList.add('entering');
+        back.style.opacity = '1'; // Ensure it's visible for non-opacity transitions
+        
+        // After a brief delay, complete the transition
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            back.classList.remove('entering');
+            back.classList.add('visible');
+            
+            // Clean up front element
+            setTimeout(() => {
+              front.classList.remove('exiting');
+              front.style.opacity = '0';
+              // Swap references
+              const t = front; front = back; back = t;
+            }, 100);
+          });
+        }, 50);
       });
     }).catch(()=>{/* ignore a single failed image */});
   }
