@@ -325,18 +325,25 @@ def now_playing():
             
             # For episodes: actively fetch season/show poster art to avoid video frames
             thumb = None
-            if media_type == 'episode' and rating_key:
-                # Fetch season metadata to get proper poster art
-                season_thumb, show_thumb = get_season_poster(base, token, rating_key, verify_tls)
-                thumb = season_thumb or show_thumb  # prefer season poster but use show poster if needed
+            if media_type == 'episode':
+                # Try to get season poster using parentRatingKey (season's rating key)
+                parent_rating_key = session.get('parentRatingKey')
+                if parent_rating_key:
+                    season_thumb, show_thumb = get_season_poster(base, token, parent_rating_key, verify_tls)
+                    thumb = season_thumb or show_thumb  # prefer season poster but use show poster if needed
+                
+                # If that didn't work, try session poster fields (already available in session data)
+                if not thumb:
+                    thumb = (
+                        session.get('parentThumb') or    # season art
+                        session.get('grandparentThumb')  # show art
+                    )
+            else:
+                # For movies, use the movie's own poster
+                thumb = session.get('thumb')
+            
+            # Last resort: use episode thumb (might be a frame) - only if nothing else worked
             if not thumb:
-                # Not an episode or couldn't get season art - try session poster fields
-                thumb = (
-                    session.get('parentThumb') or    # season art
-                    session.get('grandparentThumb')  # show art
-                )
-            if not thumb:
-                # Last resort: use episode thumb (might be a frame)
                 thumb = session.get('thumb')
 
             poster_url = None
