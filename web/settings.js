@@ -55,7 +55,18 @@
       if (has('progressBarPadding')) el('progressBarPadding').value = cfg.progressBarPadding ?? 1.5;
       if (has('progressBarHeight')) el('progressBarHeight').value = cfg.progressBarHeight ?? 2.5;
       if (has('posterTransitions')) el('posterTransitions').checked = !!cfg.posterTransitions;
-      if (has('transitionType')) el('transitionType').value = cfg.transitionType ?? 'crossfade';
+      
+      // Handle transition types array (checkboxes)
+      const transitionTypes = cfg.transitionTypes || ['crossfade'];
+      const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+      transitionCheckboxes.forEach(type => {
+        const checkboxId = `transition-${type}`;
+        if (has(checkboxId)) {
+          el(checkboxId).checked = transitionTypes.includes(type);
+        }
+      });
+      
+      if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
@@ -92,7 +103,19 @@
           if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
           if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
           if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
-          if (has('transitionType')) next.transitionType = el('transitionType').value || 'crossfade';
+          
+          // Collect selected transition types from checkboxes
+          const selectedTransitions = [];
+          const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+          transitionCheckboxes.forEach(type => {
+            const checkboxId = `transition-${type}`;
+            if (has(checkboxId) && el(checkboxId).checked) {
+              selectedTransitions.push(type);
+            }
+          });
+          // Ensure at least one transition is selected (fallback to crossfade)
+          next.transitionTypes = selectedTransitions.length > 0 ? selectedTransitions : ['crossfade'];
+          
           if (has('plexUrl')) {
             let u = (el('plexUrl').value || '').trim();
             if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -162,7 +185,19 @@
         if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
         if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
         if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
-        if (has('transitionType')) next.transitionType = el('transitionType').value || 'crossfade';
+        
+        // Collect selected transition types from checkboxes
+        const selectedTransitions = [];
+        const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+        transitionCheckboxes.forEach(type => {
+          const checkboxId = `transition-${type}`;
+          if (has(checkboxId) && el(checkboxId).checked) {
+            selectedTransitions.push(type);
+          }
+        });
+        // Ensure at least one transition is selected (fallback to crossfade)
+        next.transitionTypes = selectedTransitions.length > 0 ? selectedTransitions : ['crossfade'];
+        
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize

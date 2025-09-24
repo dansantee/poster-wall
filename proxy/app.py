@@ -114,7 +114,7 @@ def cfg_get():
     
     # Add default transition settings if not present
     config.setdefault('posterTransitions', False)
-    config.setdefault('transitionType', 'crossfade')
+    config.setdefault('transitionTypes', ['crossfade'])  # Array of selected transitions
     
     return jsonify(config)
 

@@ -60,7 +60,7 @@
       progressBarPadding:j.progressBarPadding?? 1.5,
       progressBarHeight:j.progressBarHeight?? 2.5,
       posterTransitions:!!j.posterTransitions,
-      transitionType:j.transitionType?? 'crossfade',
+      transitionTypes:(j.transitionTypes && Array.isArray(j.transitionTypes)) ? j.transitionTypes : ['crossfade'],
       plexDevices:   j.plexDevices   ?? []
     };
     
@@ -330,12 +330,12 @@
     // Debug: Log configuration values
     console.log('Swap called with config:', {
       posterTransitions: cfg.posterTransitions,
-      transitionType: cfg.transitionType
+      transitionTypes: cfg.transitionTypes
     });
     
-    // Skip transitions if disabled or using default crossfade
-    if (!cfg.posterTransitions || cfg.transitionType === 'crossfade') {
-      console.log('Using crossfade transition');
+    // Skip transitions if disabled
+    if (!cfg.posterTransitions) {
+      console.log('Transitions disabled, using basic crossfade');
       // Original crossfade behavior
       back.classList.remove('visible');
       const psrc = prox(src);
@@ -351,8 +351,48 @@
       return;
     }
 
+    // Randomly select a transition type from the available options
+    const availableTransitions = cfg.transitionTypes || ['crossfade'];
+    const randomTransitionType = availableTransitions[Math.floor(Math.random() * availableTransitions.length)];
+    console.log(`Randomly selected transition: ${randomTransitionType} from [${availableTransitions.join(', ')}]`);
+
+    // Handle crossfade as a proper transition when transitions are enabled
+    if (randomTransitionType === 'crossfade') {
+      console.log('Using enhanced crossfade transition');
+      const transitionClass = 'transition-crossfade';
+      const psrc = prox(src);
+      
+      preload(psrc).then(async ()=>{
+        back.src = psrc;
+        await applyDim(back, cfg.autoDim, psrc);
+        
+        requestAnimationFrame(()=>{
+          // Clear any existing transition classes
+          front.className = front.className.replace(/transition-\S+/g, '').trim();
+          back.className = back.className.replace(/transition-\S+/g, '').trim();
+          
+          // Add crossfade transition class
+          front.classList.add('poster', transitionClass);
+          back.classList.add('poster', transitionClass);
+          
+          // Start crossfade
+          front.classList.remove('visible');
+          front.classList.add('exiting');
+          back.classList.add('visible');
+          
+          // Clean up after transition
+          setTimeout(() => {
+            front.classList.remove('exiting');
+            front.style.opacity = '0';
+            const t = front; front = back; back = t;
+          }, 900); // Match CSS transition duration
+        });
+      }).catch(()=>{/* ignore a single failed image */});
+      return;
+    }
+
     // Advanced transitions
-    const transitionClass = `transition-${cfg.transitionType}`;
+    const transitionClass = `transition-${randomTransitionType}`;
     console.log('Using advanced transition:', transitionClass);
     const psrc = prox(src);
     

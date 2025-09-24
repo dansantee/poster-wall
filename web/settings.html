@@ -82,18 +82,42 @@
         <span>Enable Poster Transitions</span>
         <input type="checkbox" id="posterTransitions" />
       </label>
-      <label>Transition Type
-        <select id="transitionType">
-          <option value="crossfade">Crossfade (Default)</option>
-          <option value="slide-left">Slide Left</option>
-          <option value="slide-right">Slide Right</option>
-          <option value="slide-up">Slide Up</option>
-          <option value="slide-down">Slide Down</option>
-          <option value="flip">3D Flip</option>
-          <option value="scale-fade">Scale & Fade</option>
-          <option value="blur-transition">Blur Transition</option>
-        </select>
-        <small>Choose transition effect between posters. GPU-optimized for Raspberry Pi 5.</small>
+      <label>Transition Types (select multiple)
+        <div style="margin: 8px 0; padding: 10px; border: 1px solid #293041; border-radius: 10px; background: #0b0f16;">
+          <label class="inline" for="transition-crossfade">
+            <span>Crossfade</span>
+            <input type="checkbox" id="transition-crossfade" value="crossfade" />
+          </label>
+          <label class="inline" for="transition-slide-left">
+            <span>Slide Left</span>
+            <input type="checkbox" id="transition-slide-left" value="slide-left" />
+          </label>
+          <label class="inline" for="transition-slide-right">
+            <span>Slide Right</span>
+            <input type="checkbox" id="transition-slide-right" value="slide-right" />
+          </label>
+          <label class="inline" for="transition-slide-up">
+            <span>Slide Up</span>
+            <input type="checkbox" id="transition-slide-up" value="slide-up" />
+          </label>
+          <label class="inline" for="transition-slide-down">
+            <span>Slide Down</span>
+            <input type="checkbox" id="transition-slide-down" value="slide-down" />
+          </label>
+          <label class="inline" for="transition-flip">
+            <span>3D Flip</span>
+            <input type="checkbox" id="transition-flip" value="flip" />
+          </label>
+          <label class="inline" for="transition-scale-fade">
+            <span>Scale & Fade</span>
+            <input type="checkbox" id="transition-scale-fade" value="scale-fade" />
+          </label>
+          <label class="inline" for="transition-blur-transition">
+            <span>Blur Transition</span>
+            <input type="checkbox" id="transition-blur-transition" value="blur-transition" />
+          </label>
+        </div>
+        <small>Select one or more transition effects. A random effect will be chosen from your selection for each poster change. GPU-optimized for Raspberry Pi 5.</small>
       </label>
       <label class="inline" for="autoDim">
         <span>Auto-dim bright posters</span>
