@@ -60,6 +60,48 @@ To configure Plex access for the kiosk, find your Plex token:
 
 Use the Plex base URL like `http://<local-plex-ip>:32400` (adjust port if custom).
 
+After setup, visit `http://your-pi-hostname.local:8088/settings.html` to configure your poster wall.
+
+## Configuration Options
+
+The poster wall includes extensive customization options through the web interface:
+
+### Display & Typography
+- **Library Selection**: Configure which Plex library sections to include (Movies, TV Shows, etc.)
+- **Rotation Speed**: Set how long each poster is displayed (3-3600 seconds)
+- **"Now Showing" Text**: Customize the text displayed during active playback
+- **Google Fonts Integration**: Choose from 7 cinematic fonts including:
+  - Oswald, Anton, Bebas Neue (condensed poster fonts)
+  - Playfair Display, Cinzel (classical serif fonts)  
+  - Raleway, Libre Baskerville (clean modern fonts)
+- **Typography Controls**: Adjust font size, weight, letter spacing, and colors
+- **Progress Bar Customization**: Configure padding, height, and colors for the "Now Playing" progress bar
+
+### Poster Transitions
+- **Enable Transitions**: Toggle advanced poster transitions on/off
+- **Multiple Transition Types**: Select from GPU-optimized effects:
+  - **Crossfade**: Smooth opacity transition (default)
+  - **Slide Transitions**: Left, Right, Up, Down sliding effects
+  - **3D Flip**: Card flip animation using CSS 3D transforms
+  - **Scale & Fade**: Zoom in/out effects with opacity changes
+- **Random Selection**: Choose multiple transition types for variety - the system randomly picks one for each poster change
+- **Pi 5 Optimized**: All transitions use hardware-accelerated CSS transforms for smooth performance
+
+### Now Playing Integration
+- **Device Monitoring**: Configure specific Plex client devices to monitor for active playback
+- **Live Progress**: Real-time progress bar and poster display during movie/TV playback
+- **Automatic Switching**: Seamlessly switches between poster rotation and "Now Playing" mode
+- **Content Filtering**: Only shows content from your configured library sections
+- **Media Information**: Displays resolution, audio format, and content rating icons
+
+### Visual Enhancements  
+- **Auto-Dim Bright Posters**: Automatically reduces brightness of very bright movie posters
+- **Full-Width Display**: Progress bars and titles use the complete viewport width
+- **Responsive Design**: Optimized for various display orientations and resolutions
+- **TV Show Support**: Displays TV series posters alongside movies in rotation
+
+All settings are stored server-side and persist across browser sessions and system restarts.
+
 ## Extras
 
 - Hide cursor (transparent): `sudo poster-hide-cursor`
