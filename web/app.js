@@ -39,8 +39,10 @@
     }
     const j = await r.json();
     
+    console.log('Raw config from server:', j);
+    
     // Always return the config with hostname
-    return {
+    const config = {
       sectionId:     Array.isArray(j.sectionId) ? j.sectionId : [j.sectionId || '1'],
       rotateSec:     Math.max(3, Number(j.rotateSec) || 10),
       plexUrl:       j.plexUrl       ?? '',
@@ -61,6 +63,13 @@
       transitionType:j.transitionType?? 'crossfade',
       plexDevices:   j.plexDevices   ?? []
     };
+    
+    console.log('Processed config:', {
+      posterTransitions: config.posterTransitions,
+      transitionType: config.transitionType
+    });
+    
+    return config;
   }
 
   function headers(cfg){
@@ -318,8 +327,15 @@
   }
 
   function swap(cfg, src){
+    // Debug: Log configuration values
+    console.log('Swap called with config:', {
+      posterTransitions: cfg.posterTransitions,
+      transitionType: cfg.transitionType
+    });
+    
     // Skip transitions if disabled or using default crossfade
     if (!cfg.posterTransitions || cfg.transitionType === 'crossfade') {
+      console.log('Using crossfade transition');
       // Original crossfade behavior
       back.classList.remove('visible');
       const psrc = prox(src);
@@ -337,6 +353,7 @@
 
     // Advanced transitions
     const transitionClass = `transition-${cfg.transitionType}`;
+    console.log('Using advanced transition:', transitionClass);
     const psrc = prox(src);
     
     preload(psrc).then(async ()=>{
