@@ -156,34 +156,40 @@ def movies():
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     url = f"{base}/library/sections/{section}/all"
-    params = {
-        'type': 1,
-        'sort': 'addedAt:desc',
-        'X-Plex-Token': token,
-        'X-Plex-Container-Start': start,
-        'X-Plex-Container-Size': size
-    }
+    
+    # Try to fetch both movies (type=1) and TV shows (type=2) to support mixed or TV-only libraries
+    all_items = []
+    for content_type in [1, 2]:  # 1=movies, 2=TV shows
+        params = {
+            'type': content_type,
+            'sort': 'addedAt:desc',
+            'X-Plex-Token': token,
+            'X-Plex-Container-Start': 0,  # Always start from 0 to get full list for sorting
+            'X-Plex-Container-Size': 1000  # Get a large batch to sort properly
+        }
 
-    try:
-        r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
-    except Exception as e:
-        return jsonify({"error": f"Upstream request error: {e}"}), 502
-
-    if not r.ok:
-        return Response(r.content, status=r.status_code, content_type=r.headers.get('Content-Type','text/plain'))
-
-    ctype = (r.headers.get('Content-Type') or '').lower()
-    if 'json' not in ctype:
-        return Response(f"Upstream did not return JSON. Content-Type: {ctype}\n\n{r.text[:1000]}", 502, mimetype='text/plain')
-
-    data = r.json()
-    mc = data.get('MediaContainer', {}) or {}
-    metadata = mc.get('Metadata') or []
-    total_size = mc.get('totalSize') or None
+        try:
+            r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
+            if r.ok:
+                ctype = (r.headers.get('Content-Type') or '').lower()
+                if 'json' in ctype:
+                    data = r.json()
+                    mc = data.get('MediaContainer', {}) or {}
+                    metadata = mc.get('Metadata') or []
+                    all_items.extend(metadata)
+        except Exception:
+            continue  # Skip this type if it fails
+    
+    # Sort combined results by addedAt (newest first)
+    all_items.sort(key=lambda x: x.get('addedAt', 0), reverse=True)
+    
+    # Apply pagination to combined results
+    paginated_items = all_items[start:start + size]
+    total_size = len(all_items)
 
     insecure_q = '1' if not verify_tls else '0'
     items = []
-    for m in metadata:
+    for m in paginated_items:
         thumb = m.get('thumb')
         if not thumb: continue
         poster = (
@@ -195,7 +201,9 @@ def movies():
             'title':   m.get('title'),
             'year':    m.get('year'),
             'addedAt': m.get('addedAt'),
-            'poster':  poster
+            'poster':  poster,
+            'type':    m.get('type'),  # 'movie' or 'show'
+            'mediaType': 'movie' if m.get('type') == 'movie' else 'show'  # normalized type
         })
 
     return jsonify({
