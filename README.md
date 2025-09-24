@@ -134,9 +134,27 @@ python -m http.server 8088
 ## Notes
 
 - The README documents tested steps on an RPi5 — adapt as needed for other hardware.
-- If you experience display or rotation issues, try adjusting the `--fbcon-rotate` and `--session-rotate` options when running `setup.sh`.
+- If you experience display or rotation issues, try adjusting the `--rotate` option when running `setup.sh` (supports 0, 90, 180, or 270 degrees).
 
 ## License & Contributing
+
+This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)**.
+
+### What this means:
+- ✅ **Personal use**: Free to use, modify, and share for personal projects
+- ✅ **Educational use**: Free for schools, universities, and educational purposes
+- ✅ **Attribution required**: Please credit this project when sharing or using
+- ❌ **Commercial use**: Requires explicit permission - please [contact me](mailto:your-email@example.com) to discuss licensing
+
+### Full License
+You can view the complete license terms at: https://creativecommons.org/licenses/by-nc/4.0/
+
+### Commercial Licensing
+Interested in using this project commercially? I'm happy to discuss flexible licensing options. Please reach out to discuss your specific use case.
+
+---
+
+**Contributing**: Pull requests and issues are welcome! By contributing, you agree that your contributions will be licensed under the same CC BY-NC 4.0 license.
 
 
 
