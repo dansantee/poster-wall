@@ -41,6 +41,7 @@
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
       if (has('nowShowingKerning')) el('nowShowingKerning').value = cfg.nowShowingKerning ?? 0.1;
+      if (has('nowShowingFontWeight')) el('nowShowingFontWeight').value = cfg.nowShowingFontWeight ?? 700;
       if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
       if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
@@ -68,6 +69,7 @@
           if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
           if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
+          if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
           if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
           if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
           if (has('plexUrl')) {
@@ -128,6 +130,7 @@
         if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
         if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
+        if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
         if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
         if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
         if (has('plexUrl')) {
