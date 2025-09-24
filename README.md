@@ -56,11 +56,11 @@ You need a Plex token to access your library. Here's how to get it:
 
 1. Open any movie or show in Plex and click the "..." → "Get Info"
 2. Click "View XML"
-3. Look at the URL for `X-Plex-Token=...` — that long string is your token
+3. Look at the URL for `X-Plex-Token=...` — that string is your token
 
-Your Plex URL will be something like `http://192.168.1.100:32400` (use your actual Plex server IP).
+Your Plex URL will be like `http://192.168.1.100:32400` (use your actual Plex server IP).
 
-Once everything's running, visit `http://your-pi-hostname.local:8088/settings.html` to configure it.
+Once everything's running, go to `http://your-pi-hostname.local:8088/settings.html` to configure the display.
 
 ## Features
 
