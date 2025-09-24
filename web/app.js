@@ -172,11 +172,17 @@
       'stereo': 'info-icons/Sound-2.0.png',
       '2.0': 'info-icons/Sound-2.0.png',
       '5.1': 'info-icons/Sound-5.1.png',
+      '6.1': 'info-icons/Sound-5.1.png', // Use 5.1 icon for 6.1 as they're visually similar
       '7.1': 'info-icons/Dolby_TRUEHD71.png'
     };
     
     // Handle 5.1 variations (5.1, 5.1(side), etc.)
     if (channels.includes('5.1')) {
+      return 'info-icons/Sound-5.1.png';
+    }
+    
+    // Handle 6.1 variations  
+    if (channels.includes('6.1')) {
       return 'info-icons/Sound-5.1.png';
     }
     
