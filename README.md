@@ -102,11 +102,6 @@ The poster wall includes extensive customization options through the web interfa
 
 All settings are stored server-side and persist across browser sessions and system restarts.
 
-## Extras
-
-- Hide cursor (transparent): `sudo poster-hide-cursor`
-- Show cursor (Adwaita / system default): `sudo poster-show-cursor`
-
 ## Development
 
 Proxy (example local dev proxy):
