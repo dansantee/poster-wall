@@ -145,7 +145,7 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 You can view the complete license terms at: https://creativecommons.org/licenses/by-nc/4.0/
 
 ### Commercial Licensing
-Interested in using this project commercially? I'm happy to discuss flexible licensing options. Please reach out to discuss your specific use case.
+Interested in using this project commercially? I'm happy to discuss flexible licensing options. Please reach out to [me](mailto:dan@santee.ws) discuss your specific use case.
 
 ---
 
