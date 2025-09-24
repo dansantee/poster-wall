@@ -203,6 +203,20 @@
       const minSize = Math.round(fontSize * 5.33); // maintain ratio: 48px at 9vw
       const maxSize = Math.round(fontSize * 10.67); // maintain ratio: 96px at 9vw
       titleEl.style.fontSize = `clamp(${minSize}px, ${fontSize}vw, ${maxSize}px)`;
+      
+      // Apply special styling for cinematic font
+      if (cfg.nowShowingFont.includes('Impact') && cfg.nowShowingFont.includes('Franklin Gothic')) {
+        titleEl.style.fontWeight = '900';
+        titleEl.style.fontStretch = 'condensed';
+        titleEl.style.letterSpacing = '0.1em';
+        titleEl.style.textTransform = 'uppercase';
+      } else {
+        // Reset to defaults for other fonts
+        titleEl.style.fontWeight = '';
+        titleEl.style.fontStretch = '';
+        titleEl.style.letterSpacing = '';
+        titleEl.style.textTransform = '';
+      }
     }
     
     // Apply color settings by updating CSS custom properties

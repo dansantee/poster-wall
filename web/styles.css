@@ -168,11 +168,15 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   width: 95vw;
   max-width: 95vw;
   font-size: 15vh;
-  font-weight: 700;
+  font-weight: 900; /* Heavier weight for impact */
+  font-family: 'Impact', 'Franklin Gothic Medium', 'Arial Narrow', 'Arial Black', 'Helvetica Neue', sans-serif;
+  font-stretch: condensed; /* Make it narrower/taller */
+  letter-spacing: 0.1em; /* Add spacing between letters */
   text-align: center;
   margin: 0 auto 20px auto;
   color: var(--now-showing-color);
   text-shadow: 0 4px 20px rgba(244, 232, 138, 0.3);
+  text-transform: uppercase; /* Ensure it's always uppercase */
   flex-shrink: 0;
 }
 
