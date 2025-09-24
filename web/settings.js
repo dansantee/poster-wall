@@ -52,6 +52,10 @@
       if (has('nowShowingFontWeight')) el('nowShowingFontWeight').value = cfg.nowShowingFontWeight ?? 700;
       if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
       if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
+      
+      // Initialize color pickers with dynamic updates
+      initializeColorPickers();
+      
       if (has('progressBarPadding')) el('progressBarPadding').value = cfg.progressBarPadding ?? 1.5;
       if (has('progressBarHeight')) el('progressBarHeight').value = cfg.progressBarHeight ?? 2.5;
       if (has('posterTransitions')) el('posterTransitions').checked = !!cfg.posterTransitions;
@@ -255,5 +259,45 @@
         }
       });
     }
+  }
+
+  // Initialize enhanced color pickers with live preview
+  function initializeColorPickers() {
+    const colorPickers = [
+      { input: 'nowShowingColor', preview: 'nowShowingColorPreview', hex: 'nowShowingColorHex' },
+      { input: 'progressBarColor', preview: 'progressBarColorPreview', hex: 'progressBarColorHex' }
+    ];
+
+    colorPickers.forEach(picker => {
+      const inputEl = document.getElementById(picker.input);
+      const previewEl = document.getElementById(picker.preview);
+      const hexEl = document.getElementById(picker.hex);
+
+      if (inputEl && previewEl && hexEl) {
+        // Update preview and hex display
+        function updateColorDisplay() {
+          const color = inputEl.value;
+          previewEl.style.setProperty('--selected-color', color);
+          previewEl.style.backgroundColor = color;
+          hexEl.textContent = color.toUpperCase();
+        }
+
+        // Initialize display
+        updateColorDisplay();
+
+        // Update on color change
+        inputEl.addEventListener('input', updateColorDisplay);
+        inputEl.addEventListener('change', updateColorDisplay);
+
+        // Make hex value clickable to select all text
+        hexEl.addEventListener('click', function() {
+          const range = document.createRange();
+          range.selectNodeContents(hexEl);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        });
+      }
+    });
   }
 })();

@@ -67,10 +67,18 @@
         </select>
       </label>
       <label>Now Showing Text Color
-        <input type="color" id="nowShowingColor" value="#F4E88A" />
+        <div class="color-picker-container">
+          <input type="color" id="nowShowingColor" value="#F4E88A" />
+          <div class="color-preview" id="nowShowingColorPreview"></div>
+          <span class="color-hex" id="nowShowingColorHex">#F4E88A</span>
+        </div>
       </label>
       <label>Progress Bar Color
-        <input type="color" id="progressBarColor" value="#F4E88A" />
+        <div class="color-picker-container">
+          <input type="color" id="progressBarColor" value="#F4E88A" />
+          <div class="color-preview" id="progressBarColorPreview"></div>
+          <span class="color-hex" id="progressBarColorHex">#F4E88A</span>
+        </div>
       </label>
       <label>Progress Bar Padding (vh)
         <input type="number" id="progressBarPadding" value="1.5" min="0" max="5" step="0.1" />
