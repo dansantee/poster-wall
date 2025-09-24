@@ -144,7 +144,7 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 - ✅ **Personal use**: Free to use, modify, and share for personal projects
 - ✅ **Educational use**: Free for schools, universities, and educational purposes
 - ✅ **Attribution required**: Please credit this project when sharing or using
-- ❌ **Commercial use**: Requires explicit permission - please [contact me](mailto:your-email@example.com) to discuss licensing
+- ❌ **Commercial use**: Requires explicit permission - please [contact me](mailto:dan@santee.ws) to discuss licensing
 
 ### Full License
 You can view the complete license terms at: https://creativecommons.org/licenses/by-nc/4.0/
