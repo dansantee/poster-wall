@@ -166,10 +166,10 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-title {
   width: 95vw;
   max-width: 95vw;
-  font-size: clamp(72px, 14vw, 144px);
+  font-size: clamp(96px, 8vh, 180px);
   font-weight: 700;
   text-align: center;
-  margin: 0 auto 15px auto;
+  margin: 0 auto 20px auto;
   color: var(--accent);
   text-shadow: 0 4px 20px rgba(122, 162, 247, 0.3);
   flex-shrink: 0;
@@ -178,10 +178,10 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-progress {
   width: 95vw;
   max-width: 95vw;
-  height: 10px;
+  height: clamp(12px, 2vh, 24px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 5px;
-  margin: 0 auto 15px auto;
+  margin: 0 auto 30px auto;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -238,7 +238,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing-metadata-icons {
   display: flex;
-  gap: 4px;
+  gap: clamp(8px, 2vh, 20px);
   flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
@@ -250,7 +250,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing-metadata-icon {
   flex: 1;
-  height: clamp(40px, 6vw, 80px);
+  height: clamp(80px, 12vh, 160px);
   width: auto;
   min-width: 0;
   object-fit: contain;
