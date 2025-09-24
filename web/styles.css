@@ -173,7 +173,9 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   font-stretch: condensed; /* Make it narrower/taller */
   letter-spacing: 0.1em; /* Add spacing between letters */
   text-align: center;
-  margin: 0 auto 20px auto;
+  margin: 0 auto 20px auto; /* No top margin to stick to top of page */
+  padding: 0; /* Remove any default padding */
+  line-height: 0.9; /* Tighter line height to reduce font spacing */
   color: var(--now-showing-color);
   text-shadow: 0 4px 20px rgba(244, 232, 138, 0.3);
   text-transform: uppercase; /* Ensure it's always uppercase */
