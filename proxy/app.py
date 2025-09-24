@@ -79,6 +79,25 @@ def add_cors(resp):
     resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Plex-Token, X-Plex-Url, X-Allow-Insecure, X-Admin-Key'
     return resp
 
+# ---- Plex metadata helpers ----
+def get_season_poster(base, token, rating_key, verify_tls=True):
+    """Fetch season metadata to get its poster. Returns tuple (thumb, grandparentThumb)."""
+    try:
+        # First try to get the season's metadata (it has the parent show too)
+        url = f"{base}/library/metadata/{rating_key}"
+        r = requests.get(url, params={'X-Plex-Token': token}, 
+                        headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
+        if not r.ok:
+            return None, None
+            
+        data = r.json()
+        item = data.get('MediaContainer', {}).get('Metadata', [{}])[0]
+        
+        # Return (season poster, show poster) so caller can choose
+        return item.get('thumb'), item.get('parentThumb')
+    except:
+        return None, None
+
 # ---- Health ----
 @app.route('/api/ping', methods=['GET','OPTIONS'])
 def ping():
@@ -302,15 +321,24 @@ def now_playing():
             rating = session.get('contentRating', '')
             duration = int(session.get('duration', 0))  # milliseconds
             view_offset = int(session.get('viewOffset', 0))  # milliseconds
+            rating_key = session.get('ratingKey')  # needed to fetch metadata
             
-            # Get poster - prefer season poster for episodes (parentThumb), then show poster (grandparentThumb), then episode thumb
+            # For episodes: actively fetch season/show poster art to avoid video frames
             thumb = None
-            if session.get('parentThumb'):
-                thumb = session.get('parentThumb')
-            elif session.get('grandparentThumb'):
-                thumb = session.get('grandparentThumb')
-            elif session.get('thumb'):
+            if media_type == 'episode' and rating_key:
+                # Fetch season metadata to get proper poster art
+                season_thumb, show_thumb = get_season_poster(base, token, rating_key, verify_tls)
+                thumb = season_thumb or show_thumb  # prefer season poster but use show poster if needed
+            if not thumb:
+                # Not an episode or couldn't get season art - try session poster fields
+                thumb = (
+                    session.get('parentThumb') or    # season art
+                    session.get('grandparentThumb')  # show art
+                )
+            if not thumb:
+                # Last resort: use episode thumb (might be a frame)
                 thumb = session.get('thumb')
+
             poster_url = None
             if thumb:
                 insecure_q = '1' if not verify_tls else '0'
