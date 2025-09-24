@@ -84,8 +84,8 @@
     const h = headers(cfg);
 
     while (true) {
+      // Don't specify section - let the backend use all configured sections from server config
       const url = `${proxyBase()}/api/movies?` + new URLSearchParams({
-        section: cfg.sectionId[0] || '1',
         start: String(start),
         size:  String(PAGE_SIZE)
       });
