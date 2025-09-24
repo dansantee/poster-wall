@@ -21,7 +21,7 @@ Turn your Raspberry Pi into a movie poster kiosk that shows off your Plex librar
 
 ## Installation
 
-First, get your Pi updated:
+Update the RPI:
 
 ```bash
 sudo apt-get update && \
