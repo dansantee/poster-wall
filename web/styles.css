@@ -166,15 +166,15 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .now-showing-title {
-  width: 95vw;
-  max-width: 95vw;
+  width: 100vw; /* Full viewport width */
+  max-width: 100vw; /* No width constraint */
   font-size: 15vh;
   font-weight: 900; /* Heavier weight for impact */
   font-family: 'Impact', 'Franklin Gothic Medium', 'Arial Narrow', 'Arial Black', 'Helvetica Neue', sans-serif;
   font-stretch: condensed; /* Make it narrower/taller */
   letter-spacing: 0.1em; /* Add spacing between letters */
   text-align: center;
-  margin: 0 auto 20px auto; /* No top margin to stick to top of page */
+  margin: 0 0 20px 0; /* Remove horizontal centering margins */
   padding: 0; /* Remove any default padding */
   line-height: 0.9; /* Tighter line height to reduce font spacing */
   color: var(--now-showing-color);
