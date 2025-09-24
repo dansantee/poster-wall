@@ -51,6 +51,7 @@
       nowShowingText:j.nowShowingText?? 'NOW SHOWING',
       nowShowingFont:j.nowShowingFont?? "'Bebas Neue', sans-serif",
       nowShowingFontSize:j.nowShowingFontSize?? 9,
+      nowShowingKerning:j.nowShowingKerning?? 0.1,
       nowShowingColor:j.nowShowingColor?? '#F4E88A',
       progressBarColor:j.progressBarColor?? '#F4E88A',
       plexDevices:   j.plexDevices   ?? []
@@ -204,17 +205,19 @@
       const maxSize = Math.round(fontSize * 10.67); // maintain ratio: 96px at 9vw
       titleEl.style.fontSize = `clamp(${minSize}px, ${fontSize}vw, ${maxSize}px)`;
       
+      // Apply kerning (letter-spacing) from settings
+      const kerning = cfg.nowShowingKerning ?? 0.1;
+      titleEl.style.letterSpacing = `${kerning}em`;
+      
       // Apply special styling for cinematic font
       if (cfg.nowShowingFont.includes('Impact') && cfg.nowShowingFont.includes('Franklin Gothic')) {
         titleEl.style.fontWeight = '900';
         titleEl.style.fontStretch = 'condensed';
-        titleEl.style.letterSpacing = '0.1em';
         titleEl.style.textTransform = 'uppercase';
       } else {
         // Reset to defaults for other fonts
         titleEl.style.fontWeight = '';
         titleEl.style.fontStretch = '';
-        titleEl.style.letterSpacing = '';
         titleEl.style.textTransform = '';
       }
     }
