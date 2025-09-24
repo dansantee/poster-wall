@@ -400,37 +400,39 @@
       await applyDim(back, cfg.autoDim, psrc);
       
       requestAnimationFrame(()=>{
-        // Clear any existing transition classes
-        front.className = front.className.replace(/transition-\S+/g, '').trim();
-        back.className = back.className.replace(/transition-\S+/g, '').trim();
+        // Clear any existing transition classes and reset states
+        front.className = 'poster';
+        back.className = 'poster';
         
-        // Add transition class to both elements
-        front.classList.add('poster', transitionClass);
-        back.classList.add('poster', transitionClass);
+        // Add the specific transition class
+        front.classList.add(transitionClass);
+        back.classList.add(transitionClass);
         
-        // Start exit transition on front element
-        front.classList.remove('visible');
-        front.classList.add('exiting');
-        
-        // Start enter transition on back element  
+        // Set initial states - back element starts in "entering" position
         back.classList.add('entering');
-        back.style.opacity = '1'; // Ensure it's visible for non-opacity transitions
         
-        // After a brief delay, complete the transition
-        setTimeout(() => {
-          requestAnimationFrame(() => {
-            back.classList.remove('entering');
-            back.classList.add('visible');
+        // Use a short delay to ensure the entering state is applied before transitioning
+        requestAnimationFrame(() => {
+          // Start the transition: front exits, back becomes visible
+          front.classList.remove('visible');
+          front.classList.add('exiting');
+          
+          back.classList.remove('entering');
+          back.classList.add('visible');
+          
+          // Clean up after transition completes
+          setTimeout(() => {
+            // Remove all transition classes
+            front.classList.remove(transitionClass, 'exiting');
+            back.classList.remove(transitionClass);
             
-            // Clean up front element
-            setTimeout(() => {
-              front.classList.remove('exiting');
-              front.style.opacity = '0';
-              // Swap references
-              const t = front; front = back; back = t;
-            }, 100);
-          });
-        }, 50);
+            // Reset front element opacity for next transition
+            front.style.opacity = '0';
+            
+            // Swap references
+            const t = front; front = back; back = t;
+          }, 1000); // Allow full transition time
+        });
       });
     }).catch(()=>{/* ignore a single failed image */});
   }
