@@ -359,7 +359,6 @@
     // Handle crossfade as a proper transition when transitions are enabled
     if (randomTransitionType === 'crossfade') {
       console.log('Using enhanced crossfade transition');
-      const transitionClass = 'transition-crossfade';
       const psrc = prox(src);
       
       preload(psrc).then(async ()=>{
@@ -371,21 +370,21 @@
           front.className = front.className.replace(/transition-\S+/g, '').trim();
           back.className = back.className.replace(/transition-\S+/g, '').trim();
           
-          // Add crossfade transition class
-          front.classList.add('poster', transitionClass);
-          back.classList.add('poster', transitionClass);
+          // Add base poster class and crossfade transition class
+          front.classList.add('poster', 'transition-crossfade');
+          back.classList.add('poster', 'transition-crossfade');
           
-          // Start crossfade
+          // Start crossfade: hide front, show back
           front.classList.remove('visible');
-          front.classList.add('exiting');
           back.classList.add('visible');
           
-          // Clean up after transition
+          // Clean up and swap references after transition
           setTimeout(() => {
-            front.classList.remove('exiting');
-            front.style.opacity = '0';
+            front.classList.remove('transition-crossfade');
+            back.classList.remove('transition-crossfade');
+            // Swap references for next transition
             const t = front; front = back; back = t;
-          }, 900); // Match CSS transition duration
+          }, 1000); // Allow full transition time
         });
       }).catch(()=>{/* ignore a single failed image */});
       return;
