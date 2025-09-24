@@ -186,6 +186,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
 }
 
 .now-showing-progress-bar {
@@ -194,7 +195,11 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   border-radius: clamp(8px, 1vh, 16px);
   transition: width 1s ease;
   box-shadow: 0 0 15px rgba(244, 232, 138, 0.5);
-  min-width: 8px; /* Ensure bar is always visible even at very low progress */
+  min-width: 0; /* Allow it to be completely empty at 0% */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0%; /* Start at 0%, JavaScript will set the actual width */
 }
 
 .now-showing-poster {
