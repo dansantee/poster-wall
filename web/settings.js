@@ -58,7 +58,7 @@
       
       // Handle transition types array (checkboxes)
       const transitionTypes = cfg.transitionTypes || ['crossfade'];
-      const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+      const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade'];
       transitionCheckboxes.forEach(type => {
         const checkboxId = `transition-${type}`;
         if (has(checkboxId)) {
@@ -106,7 +106,7 @@
           
           // Collect selected transition types from checkboxes
           const selectedTransitions = [];
-          const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+          const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade'];
           transitionCheckboxes.forEach(type => {
             const checkboxId = `transition-${type}`;
             if (has(checkboxId) && el(checkboxId).checked) {
@@ -188,7 +188,7 @@
         
         // Collect selected transition types from checkboxes
         const selectedTransitions = [];
-        const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade', 'blur-transition'];
+        const transitionCheckboxes = ['crossfade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'flip', 'scale-fade'];
         transitionCheckboxes.forEach(type => {
           const checkboxId = `transition-${type}`;
           if (has(checkboxId) && el(checkboxId).checked) {
