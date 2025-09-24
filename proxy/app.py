@@ -303,8 +303,14 @@ def now_playing():
             duration = int(session.get('duration', 0))  # milliseconds
             view_offset = int(session.get('viewOffset', 0))  # milliseconds
             
-            # Get poster
-            thumb = session.get('thumb') or session.get('grandparentThumb')
+            # Get poster - prefer season poster for episodes (parentThumb), then show poster (grandparentThumb), then episode thumb
+            thumb = None
+            if session.get('parentThumb'):
+                thumb = session.get('parentThumb')
+            elif session.get('grandparentThumb'):
+                thumb = session.get('grandparentThumb')
+            elif session.get('thumb'):
+                thumb = session.get('thumb')
             poster_url = None
             if thumb:
                 insecure_q = '1' if not verify_tls else '0'
