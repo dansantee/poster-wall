@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, requests, urllib3, subprocess, socket
+import os, json, pathlib, requests, urllib3, subprocess, socket, random
 from urllib.parse import quote_plus
 
 app = Flask(__name__)
@@ -164,38 +164,39 @@ def movies():
     if not verify_tls:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    # Try to fetch from all configured sections
+    # Get all content from all configured sections
     all_items = []
     
     for section in sections:
         url = f"{base}/library/sections/{section}/all"
         
-        # For each section, try both movies (type=1) and TV shows (type=2)
-        for content_type in [1, 2]:  # 1=movies, 2=TV shows
-            params = {
-                'type': content_type,
-                'sort': 'addedAt:desc',
-                'X-Plex-Token': token,
-                'X-Plex-Container-Start': 0,  # Always start from 0 to get full list for sorting
-                'X-Plex-Container-Size': 1000  # Get a large batch to sort properly
-            }
+        # Get all content from this section (don't specify type - get everything)
+        params = {
+            'sort': 'addedAt:desc',
+            'X-Plex-Token': token,
+            'X-Plex-Container-Start': 0,
+            'X-Plex-Container-Size': 2000  # Get a large batch
+        }
 
-            try:
-                r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
-                if r.ok:
-                    ctype = (r.headers.get('Content-Type') or '').lower()
-                    if 'json' in ctype:
-                        data = r.json()
-                        mc = data.get('MediaContainer', {}) or {}
-                        metadata = mc.get('Metadata') or []
-                        all_items.extend(metadata)
-            except Exception:
-                continue  # Skip this type/section if it fails
+        try:
+            r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
+            if r.ok:
+                ctype = (r.headers.get('Content-Type') or '').lower()
+                if 'json' in ctype:
+                    data = r.json()
+                    mc = data.get('MediaContainer', {}) or {}
+                    metadata = mc.get('Metadata') or []
+                    # Filter to only movies and TV shows (exclude music, photos, etc.)
+                    filtered_metadata = [item for item in metadata if item.get('type') in ['movie', 'show']]
+                    all_items.extend(filtered_metadata)
+        except Exception as e:
+            print(f"Error fetching from section {section}: {e}")
+            continue  # Skip this section if it fails
     
-    # Sort combined results by addedAt (newest first)
-    all_items.sort(key=lambda x: x.get('addedAt', 0), reverse=True)
+    # Shuffle all items randomly to mix movies and TV shows
+    random.shuffle(all_items)
     
-    # Apply pagination to combined results
+    # Apply pagination to shuffled results
     paginated_items = all_items[start:start + size]
     total_size = len(all_items)
 
