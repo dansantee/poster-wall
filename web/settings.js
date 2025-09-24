@@ -30,13 +30,20 @@
       const cfg = await loadServerCfg();
 
       // populate (null-safe; fields may be removed from HTML)
-      if (has('sectionId'))   el('sectionId').value    = cfg.sectionId ?? '1';
+      if (has('sectionId'))   {
+        // Handle both string and array formats for backward compatibility
+        const sections = cfg.sectionId;
+        if (Array.isArray(sections)) {
+          el('sectionId').value = sections.join(', ');
+        } else {
+          el('sectionId').value = sections ?? '1';
+        }
+      }
       if (has('rotateSec'))   el('rotateSec').value    = cfg.rotateSec ?? 10;
       if (has('plexUrl'))     el('plexUrl').value      = cfg.plexUrl   ?? '';
       if (has('plexToken'))   el('plexToken').value    = cfg.plexToken ?? '';
       if (has('plexInsecure'))el('plexInsecure').checked = cfg.plexInsecure ?? true;
       if (has('plexDevices')) el('plexDevices').value   = (cfg.plexDevices || []).join('\n');
-      if (has('excludedLibraries')) el('excludedLibraries').value = (cfg.excludedLibraries || []).join(', ');
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
@@ -65,7 +72,12 @@
       el('btnSave').addEventListener('click', async () => {
         try {
           const next = { ...cfg };
-          if (has('sectionId'))    next.sectionId    = (el('sectionId').value || '1').trim();
+          if (has('sectionId')) {
+            const sections = (el('sectionId').value || '1').split(',')
+              .map(id => id.trim())
+              .filter(id => id.length > 0);
+            next.sectionId = sections;
+          }
           if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
           if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
           if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
@@ -89,12 +101,6 @@
               .map(line => line.trim())
               .filter(line => line.length > 0);
             next.plexDevices = devices;
-          }
-          if (has('excludedLibraries')) {
-            const libraries = (el('excludedLibraries').value || '').split(',')
-              .map(id => id.trim())
-              .filter(id => id.length > 0);
-            next.excludedLibraries = libraries;
           }
 
           await saveServerCfg(next);
@@ -134,7 +140,12 @@
       el('plex-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const next = { ...cfg };
-        if (has('sectionId'))    next.sectionId    = (el('sectionId').value || '1').trim();
+        if (has('sectionId')) {
+          const sections = (el('sectionId').value || '1').split(',')
+            .map(id => id.trim())
+            .filter(id => id.length > 0);
+          next.sectionId = sections;
+        }
         if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
         if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
         if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
@@ -158,12 +169,6 @@
             .map(line => line.trim())
             .filter(line => line.length > 0);
           next.plexDevices = devices;
-        }
-        if (has('excludedLibraries')) {
-          const libraries = (el('excludedLibraries').value || '').split(',')
-            .map(id => id.trim())
-            .filter(id => id.length > 0);
-          next.excludedLibraries = libraries;
         }
 
         await saveServerCfg(next);
@@ -197,7 +202,7 @@
           if (c.plexInsecure) headers['X-Allow-Insecure'] = '1';
 
           const url = `${proxyBase()}/api/movies?` + new URLSearchParams({
-            section: c.sectionId || '1',
+            section: Array.isArray(c.sectionId) ? c.sectionId[0] : (c.sectionId || '1'),
             start: '0',
             size:  '1'
           });

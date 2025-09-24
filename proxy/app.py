@@ -305,12 +305,14 @@ def now_playing():
             if not device_match:
                 continue
             
-            # Check if this session is from an excluded library
-            excluded_libraries = srv.get('excludedLibraries', [])
-            if excluded_libraries:
-                library_section_id = str(session.get('librarySectionID', ''))
-                if library_section_id in excluded_libraries:
-                    continue  # Skip sessions from excluded libraries
+            # Check if this session is from an included library (whitelist approach)
+            included_sections = srv.get('sectionId', ['1'])  # Default to section 1 if not configured
+            if not isinstance(included_sections, list):
+                included_sections = [included_sections]  # Convert single value to list for backward compatibility
+            
+            library_section_id = str(session.get('librarySectionID', ''))
+            if library_section_id not in included_sections:
+                continue  # Skip sessions from non-included libraries
             
             # Extract media information
             media_type = session.get('type')

@@ -41,7 +41,7 @@
     
     // Always return the config with hostname
     return {
-      sectionId:     j.sectionId     ?? '1',
+      sectionId:     Array.isArray(j.sectionId) ? j.sectionId : [j.sectionId || '1'],
       rotateSec:     Math.max(3, Number(j.rotateSec) || 10),
       plexUrl:       j.plexUrl       ?? '',
       plexToken:     j.plexToken     ?? '',
@@ -57,8 +57,7 @@
       progressBarColor:j.progressBarColor?? '#F4E88A',
       progressBarPadding:j.progressBarPadding?? 1.5,
       progressBarHeight:j.progressBarHeight?? 2.5,
-      plexDevices:   j.plexDevices   ?? [],
-      excludedLibraries: j.excludedLibraries ?? []
+      plexDevices:   j.plexDevices   ?? []
     };
   }
 
@@ -86,7 +85,7 @@
 
     while (true) {
       const url = `${proxyBase()}/api/movies?` + new URLSearchParams({
-        section: cfg.sectionId || '1',
+        section: cfg.sectionId[0] || '1',
         start: String(start),
         size:  String(PAGE_SIZE)
       });
@@ -97,7 +96,7 @@
           if (r.status === 401) {
             throw new Error('Plex authentication failed. Please check your Plex token.');
           } else if (r.status === 404) {
-            throw new Error(`Plex section ${cfg.sectionId} not found. Please check your section ID.`);
+            throw new Error(`Plex section ${cfg.sectionId.join(', ')} not found. Please check your section ID(s).`);
           } else if (r.status === 400) {
             // Check if this might be due to incomplete config
             if (!cfg.plexUrl || !cfg.plexToken) {

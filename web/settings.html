@@ -21,8 +21,9 @@
   <section class="card">
     <h2>Display Options</h2>
     <form id="display-form">
-      <label>Section ID (Movies Library)
-        <input type="text" id="sectionId" placeholder="1" />
+      <label>Section IDs (comma-separated)
+        <input type="text" id="sectionId" placeholder="1, 2" />
+        <small>Library section IDs to include in poster rotation and "Now Playing" (e.g., Movies=1, TV Shows=2)</small>
       </label>
       <label>Rotation Seconds
         <input type="number" id="rotateSec" min="3" max="3600" placeholder="120" />
@@ -95,10 +96,6 @@
       </label>
       <label>Plex Client Devices (one IP/hostname per line)
         <textarea id="plexDevices" rows="4" placeholder="192.168.1.100&#10;apple-tv.local&#10;roku-player&#10;nvidia-shield.home"></textarea>
-      </label>
-      <label>Excluded Library IDs (comma-separated)
-        <input type="text" id="excludedLibraries" placeholder="8, 12, 15" />
-        <small>Library section IDs to exclude from "Now Playing" (e.g., music videos, concerts)</small>
       </label>
       <label class="inline" for="plexInsecure">
         <span>Allow Insecure Certificates</span>
