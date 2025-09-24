@@ -1,21 +1,21 @@
 # poster-wall
 
-Turn your Raspberry Pi into a sweet movie poster kiosk that shows off your Plex library.
+Turn your Raspberry Pi into a movie poster kiosk that shows off your Plex library.
 
 ## What you need
 
 - Raspberry Pi 5 (4GB) - this is what I've tested on, other models might work
-- Raspberry Pi OS Lite 64-bit (Bookworm is good)
+- Raspberry Pi OS Lite 64-bit (Bookworm)
 - SSH enabled and wifi/ethernet setup
 
 ## Quick setup
 
 1. Flash Raspberry Pi OS Lite (64-bit) to your SD card
 2. In the imager's "Advanced options" set up:
-   - Your hostname
+   - Hostname
    - Username and password  
    - WiFi credentials
-   - Locale stuff
+   - Locale
    - Enable SSH
 3. Boot it up and SSH in
 
