@@ -39,7 +39,7 @@ sudo apt install git -y
 Clone the project:
 
 ```bash
-git clone git@github.com:dansantee/poster-wall.git
+git clone https://github.com/your-username/poster-wall.git
 cd poster-wall
 ```
 
@@ -114,7 +114,7 @@ python -m venv .venv
 pip install flask requests
 # Set environment variables and run:
 export PLEX_URL="http://192.168.1.5:32400"
-export PLEX_TOKEN="R9TBSeRe-g6yWqtj5p2s"
+export PLEX_TOKEN="your-plex-token-here"
 export SECTION_ID="1"
 python app.py
 ```
