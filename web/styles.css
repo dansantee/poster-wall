@@ -200,6 +200,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   left: 0;
   top: 0;
   width: 0%; /* Start at 0%, JavaScript will set the actual width */
+  display: block; /* Ensure it's visible */
 }
 
 .now-showing-poster {

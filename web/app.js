@@ -322,7 +322,12 @@
       titleEl.textContent = cfg.nowShowingText;
       applyFontSettings(cfg);
     }
-    if (progressBar) progressBar.style.width = `${data.progress || 0}%`;
+    if (progressBar) {
+      console.log(`Setting progress bar width to: ${data.progress || 0}%`);
+      progressBar.style.width = `${data.progress || 0}%`;
+      // Force a repaint to ensure the change takes effect
+      progressBar.offsetWidth;
+    }
     if (poster && data.poster) poster.src = prox(data.poster);
     
     // Clear existing icons
@@ -414,7 +419,10 @@
         // Update progress bar if still playing
         const progressBar = document.getElementById('nowShowingProgressBar');
         if (progressBar) {
+          console.log(`Updating progress bar width to: ${nowPlayingData.progress || 0}%`);
           progressBar.style.width = `${nowPlayingData.progress || 0}%`;
+          // Force a repaint to ensure the change takes effect
+          progressBar.offsetWidth;
         }
       }
     }, 5000);
