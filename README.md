@@ -118,7 +118,7 @@ python -m http.server 8088
 ## Notes
 
 - I've only tested this on a Pi 5, but other models might work fine
-- If your display looks weird or rotated wrong, try different `--rotate` values (0, 90, 180, 270) when running `setup.sh`
+- If you need different rotations, use different `--rotate` values (0, 90, 180, 270) when running `setup.sh` (it can be run multiple times)
 
 ## License
 
