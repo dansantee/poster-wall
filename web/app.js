@@ -327,10 +327,16 @@
   }
 
   function swap(cfg, src){
-    // Debug: Log configuration values
+    // Debug: Log configuration values and element states
     console.log('Swap called with config:', {
       posterTransitions: cfg.posterTransitions,
       transitionTypes: cfg.transitionTypes
+    });
+    console.log('Element states before swap:', {
+      frontVisible: front.classList.contains('visible'),
+      backVisible: back.classList.contains('visible'),
+      frontSrc: front.src ? front.src.split('/').pop() : 'no-src',
+      backSrc: back.src ? back.src.split('/').pop() : 'no-src'
     });
     
     // Skip transitions if disabled
@@ -400,9 +406,11 @@
       await applyDim(back, cfg.autoDim, psrc);
       
       requestAnimationFrame(()=>{
-        // Clear any existing transition classes and reset states
+        // Ensure clean starting state
         front.className = 'poster';
         back.className = 'poster';
+        front.style.opacity = '';
+        back.style.opacity = '';
         
         // Add the specific transition class
         front.classList.add(transitionClass);
@@ -410,6 +418,11 @@
         
         // Set initial states - back element starts in "entering" position
         back.classList.add('entering');
+        
+        console.log('Starting transition with classes:', {
+          front: front.className,
+          back: back.className
+        });
         
         // Use a short delay to ensure the entering state is applied before transitioning
         requestAnimationFrame(() => {
@@ -420,17 +433,30 @@
           back.classList.remove('entering');
           back.classList.add('visible');
           
+          console.log('Mid-transition classes:', {
+            front: front.className,
+            back: back.className
+          });
+          
           // Clean up after transition completes
           setTimeout(() => {
-            // Remove all transition classes
-            front.classList.remove(transitionClass, 'exiting');
-            back.classList.remove(transitionClass);
+            console.log('Cleaning up transition');
             
-            // Reset front element opacity for next transition
-            front.style.opacity = '0';
+            // Completely reset both elements
+            front.className = 'poster';
+            back.className = 'poster visible';
+            front.style.opacity = '';
+            back.style.opacity = '';
+            
+            console.log('Post-cleanup classes:', {
+              front: front.className,
+              back: back.className
+            });
             
             // Swap references
             const t = front; front = back; back = t;
+            
+            console.log('After swap - front visible:', front.classList.contains('visible'));
           }, 1000); // Allow full transition time
         });
       });
