@@ -64,14 +64,14 @@ Once everything's running, visit `http://your-pi-hostname.local:8088/settings.ht
 
 ## Features
 
-The settings page lets you customize pretty much everything:
+The settings page lets you customize the setup:
 
-**Basic stuff:**
-- Pick which Plex libraries to show (Movies, TV, whatever)
+**Basic settings:**
+- Pick which Plex libraries to show (Movies, TV, etc.)
 - Control rotation speed (3 seconds to 1 hour)
 - Change the "Now Showing" text
-- Choose from some nice Google Fonts (Oswald, Playfair Display, etc.)
-- Tweak font sizes, spacing, colors
+- Choose from some fonts
+- Change font sizes, spacing, colors
 
 **Poster transitions:**
 - Basic crossfade (default)
@@ -79,24 +79,21 @@ The settings page lets you customize pretty much everything:
 - 3D flip animation
 - Scale and fade effects
 - Or pick multiple and let it randomly choose
-- All GPU-accelerated so it's smooth on the Pi 5
 
 **"Now Playing" mode:**
 - Monitors your Plex clients for active playback
 - Shows live progress bar
 - Automatically switches when someone starts watching something
 - Displays resolution badges, audio format, ratings
-- Works with the libraries you've selected
+- Works with the libraries selected
 
-**Other nice touches:**
-- Auto-dims overly bright posters
-- Responsive design
-- Settings persist across restarts
+**Other features:**
+- Auto-dims overly bright posters, white backgrounds, etc.
 - Works with both movies and TV shows
 
 ## Development
 
-If you want to hack on this locally:
+Local dev work:
 
 **Backend proxy:**
 ```bash
