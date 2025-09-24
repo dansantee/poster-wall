@@ -141,7 +141,16 @@ def movies():
     size  = max(1, min(size, 1000))  # clamp reasonable size
 
     srv = load_cfg()
-    section = request.args.get('section') or srv.get('sectionId') or DEFAULT_SECTION
+    # Handle multiple section IDs from config
+    sections = srv.get('sectionId', [DEFAULT_SECTION])
+    if not isinstance(sections, list):
+        sections = [sections]  # Convert single value to list for backward compatibility
+    
+    # Also check for section parameter (for individual requests)
+    section_param = request.args.get('section')
+    if section_param:
+        sections = [section_param]  # Override with specific section if requested
+        
     token = token_from(request)
     if not token:
         return jsonify({"error":"PLEX_TOKEN not configured server-side; client token missing"}), 400
@@ -155,30 +164,33 @@ def movies():
     if not verify_tls:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    url = f"{base}/library/sections/{section}/all"
-    
-    # Try to fetch both movies (type=1) and TV shows (type=2) to support mixed or TV-only libraries
+    # Try to fetch from all configured sections
     all_items = []
-    for content_type in [1, 2]:  # 1=movies, 2=TV shows
-        params = {
-            'type': content_type,
-            'sort': 'addedAt:desc',
-            'X-Plex-Token': token,
-            'X-Plex-Container-Start': 0,  # Always start from 0 to get full list for sorting
-            'X-Plex-Container-Size': 1000  # Get a large batch to sort properly
-        }
+    
+    for section in sections:
+        url = f"{base}/library/sections/{section}/all"
+        
+        # For each section, try both movies (type=1) and TV shows (type=2)
+        for content_type in [1, 2]:  # 1=movies, 2=TV shows
+            params = {
+                'type': content_type,
+                'sort': 'addedAt:desc',
+                'X-Plex-Token': token,
+                'X-Plex-Container-Start': 0,  # Always start from 0 to get full list for sorting
+                'X-Plex-Container-Size': 1000  # Get a large batch to sort properly
+            }
 
-        try:
-            r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
-            if r.ok:
-                ctype = (r.headers.get('Content-Type') or '').lower()
-                if 'json' in ctype:
-                    data = r.json()
-                    mc = data.get('MediaContainer', {}) or {}
-                    metadata = mc.get('Metadata') or []
-                    all_items.extend(metadata)
-        except Exception:
-            continue  # Skip this type if it fails
+            try:
+                r = requests.get(url, params=params, headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
+                if r.ok:
+                    ctype = (r.headers.get('Content-Type') or '').lower()
+                    if 'json' in ctype:
+                        data = r.json()
+                        mc = data.get('MediaContainer', {}) or {}
+                        metadata = mc.get('Metadata') or []
+                        all_items.extend(metadata)
+            except Exception:
+                continue  # Skip this type/section if it fails
     
     # Sort combined results by addedAt (newest first)
     all_items.sort(key=lambda x: x.get('addedAt', 0), reverse=True)
