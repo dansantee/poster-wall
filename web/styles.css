@@ -15,7 +15,8 @@ html,body{height:100%;margin:0;background:#000;color:var(--text);font-family:sys
 body.onesheet #stage{
   position:fixed; inset:0;
   display:grid; place-items:center;
-  padding: min(5vh, 40px);
+  /* Remove padding so posters can use the full viewport (useful for tall/vertical displays) */
+  padding: 0;
 }
 #poster{
   max-height: 88vh;
@@ -72,17 +73,20 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   position: absolute;
   inset: 0;
   margin: auto;
+  /* Make the poster scale to the viewport height first, but never exceed viewport width.
+     This ensures the full poster is always visible (object-fit: contain) and it fills
+     as much of the screen as possible on tall/vertical displays. */
+  height: 100vh;
+  width: auto;
   max-width: 100vw;
   max-height: 100vh;
-  width: auto;
-  height: auto;
   object-fit: contain;
   object-position: center;
   border-radius: 0 !important;
   box-shadow: none !important;
   opacity: 0;
-  transition: opacity 900ms ease;
-  will-change: opacity;
+  transition: opacity 900ms ease, filter 300ms ease;
+  will-change: opacity, filter;
   image-rendering: -webkit-optimize-contrast;
 }
 
@@ -191,10 +195,12 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .now-showing-poster {
-  width: 100vw;
+  /* Allow the now-playing poster to grow up to the full viewport while remaining fully visible */
   max-width: 100vw;
-  max-height: 85vh;
-  margin: 0 auto 0 auto;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
   object-fit: contain;
   object-position: center;
   border-radius: 0;
