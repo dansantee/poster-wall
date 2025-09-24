@@ -77,8 +77,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .color-picker-container input[type="color"] {
-  width: 40px;
-  height: 40px;
+  width: 80px;
+  height: 50px;
   border: 2px solid #293041;
   border-radius: 8px;
   cursor: pointer;
@@ -89,7 +89,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .color-picker-container input[type="color"]:hover {
   border-color: var(--accent);
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .color-picker-container input[type="color"]::-webkit-color-swatch-wrapper {
@@ -106,36 +106,6 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .color-picker-container input[type="color"]::-moz-color-swatch {
   border: none;
   border-radius: 6px;
-}
-
-.color-preview {
-  width: 120px;
-  height: 50px;
-  border-radius: 8px;
-  border: 2px solid #293041;
-  flex-shrink: 0;
-  position: relative;
-  background: var(--selected-color, #F4E88A);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-  transition: transform 0.1s ease;
-}
-
-.color-preview:hover {
-  transform: scale(1.02);
-}
-
-.color-preview::before {
-  content: 'Preview';
-  position: absolute;
-  bottom: -22px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  color: var(--muted);
-  opacity: 0.8;
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
 }
 
 .color-hex {

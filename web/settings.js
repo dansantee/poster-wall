@@ -261,33 +261,30 @@
     }
   }
 
-  // Initialize enhanced color pickers with live preview
+  // Initialize enhanced color pickers with live hex updates
   function initializeColorPickers() {
     const colorPickers = [
-      { input: 'nowShowingColor', preview: 'nowShowingColorPreview', hex: 'nowShowingColorHex' },
-      { input: 'progressBarColor', preview: 'progressBarColorPreview', hex: 'progressBarColorHex' }
+      { input: 'nowShowingColor', hex: 'nowShowingColorHex' },
+      { input: 'progressBarColor', hex: 'progressBarColorHex' }
     ];
 
     colorPickers.forEach(picker => {
       const inputEl = document.getElementById(picker.input);
-      const previewEl = document.getElementById(picker.preview);
       const hexEl = document.getElementById(picker.hex);
 
-      if (inputEl && previewEl && hexEl) {
-        // Update preview and hex display
-        function updateColorDisplay() {
+      if (inputEl && hexEl) {
+        // Update hex display
+        function updateHexDisplay() {
           const color = inputEl.value;
-          previewEl.style.setProperty('--selected-color', color);
-          previewEl.style.backgroundColor = color;
           hexEl.textContent = color.toUpperCase();
         }
 
         // Initialize display
-        updateColorDisplay();
+        updateHexDisplay();
 
         // Update on color change
-        inputEl.addEventListener('input', updateColorDisplay);
-        inputEl.addEventListener('change', updateColorDisplay);
+        inputEl.addEventListener('input', updateHexDisplay);
+        inputEl.addEventListener('change', updateHexDisplay);
 
         // Make hex value clickable to select all text
         hexEl.addEventListener('click', function() {
