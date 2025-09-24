@@ -181,6 +181,10 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   text-shadow: 0 4px 20px rgba(244, 232, 138, 0.3);
   text-transform: uppercase; /* Ensure it's always uppercase */
   flex-shrink: 0;
+  /* Optimize font rendering for Google Fonts */
+  font-display: swap;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .now-showing-progress {

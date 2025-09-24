@@ -215,14 +215,41 @@
       const fontWeight = cfg.nowShowingFontWeight ?? 700;
       titleEl.style.fontWeight = fontWeight;
       
-      // Apply special styling for cinematic font
-      if (cfg.nowShowingFont.includes('Impact') && cfg.nowShowingFont.includes('Franklin Gothic')) {
+      // Apply special styling based on font choice
+      const fontFamily = cfg.nowShowingFont.toLowerCase();
+      
+      // Reset all special properties first
+      titleEl.style.fontStretch = '';
+      titleEl.style.textTransform = '';
+      titleEl.style.fontVariant = '';
+      
+      if (fontFamily.includes('impact') && fontFamily.includes('franklin gothic')) {
+        // Original cinematic font combo
         titleEl.style.fontStretch = 'condensed';
         titleEl.style.textTransform = 'uppercase';
-      } else {
-        // Reset to defaults for other fonts
-        titleEl.style.fontStretch = '';
-        titleEl.style.textTransform = '';
+      } else if (fontFamily.includes('oswald')) {
+        // Oswald: Tall, condensed sans serif - perfect for headers
+        titleEl.style.textTransform = 'uppercase';
+      } else if (fontFamily.includes('anton')) {
+        // Anton: Heavy, bold, condensed - theater block lettering
+        titleEl.style.textTransform = 'uppercase';
+      } else if (fontFamily.includes('bebas neue')) {
+        // Bebas Neue: Very popular tall sans - widely used in posters
+        titleEl.style.textTransform = 'uppercase';
+      } else if (fontFamily.includes('playfair display')) {
+        // Playfair Display: Serif with high contrast - classical look
+        titleEl.style.textTransform = 'uppercase';
+        titleEl.style.fontVariant = 'small-caps';
+      } else if (fontFamily.includes('cinzel')) {
+        // Cinzel: Roman inscriptions inspired - dramatic posters
+        titleEl.style.textTransform = 'uppercase';
+      } else if (fontFamily.includes('raleway')) {
+        // Raleway: Clean, modern sans - pairs with dramatic display type
+        titleEl.style.textTransform = 'uppercase';
+      } else if (fontFamily.includes('libre baskerville')) {
+        // Libre Baskerville: Classic serif - refined marquee feel
+        titleEl.style.textTransform = 'uppercase';
+        titleEl.style.fontVariant = 'small-caps';
       }
     }
     
