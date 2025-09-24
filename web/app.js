@@ -51,6 +51,8 @@
       nowShowingText:j.nowShowingText?? 'NOW SHOWING',
       nowShowingFont:j.nowShowingFont?? "'Bebas Neue', sans-serif",
       nowShowingFontSize:j.nowShowingFontSize?? 9,
+      nowShowingColor:j.nowShowingColor?? '#F4E88A',
+      progressBarColor:j.progressBarColor?? '#F4E88A',
       plexDevices:   j.plexDevices   ?? []
     };
   }
@@ -189,15 +191,27 @@
     return channelMap[channels.toLowerCase()] || null;
   }
 
-  // ---- font settings helper ----
+  // ---- font and color settings helper ----
   function applyFontSettings(cfg) {
     const titleEl = document.getElementById('nowShowingTitle');
+    const progressBarEl = document.getElementById('nowShowingProgressBar');
+    
+    // Apply font settings
     if (titleEl && cfg.nowShowingFont && cfg.nowShowingFontSize) {
       titleEl.style.fontFamily = cfg.nowShowingFont;
       const fontSize = cfg.nowShowingFontSize;
       const minSize = Math.round(fontSize * 5.33); // maintain ratio: 48px at 9vw
       const maxSize = Math.round(fontSize * 10.67); // maintain ratio: 96px at 9vw
       titleEl.style.fontSize = `clamp(${minSize}px, ${fontSize}vw, ${maxSize}px)`;
+    }
+    
+    // Apply color settings by updating CSS custom properties
+    const root = document.documentElement;
+    if (cfg.nowShowingColor) {
+      root.style.setProperty('--now-showing-color', cfg.nowShowingColor);
+    }
+    if (cfg.progressBarColor) {
+      root.style.setProperty('--progress-bar-color', cfg.progressBarColor);
     }
   }
 

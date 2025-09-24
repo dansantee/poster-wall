@@ -40,6 +40,8 @@
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
+      if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
+      if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
@@ -64,6 +66,8 @@
           if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
           if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
+          if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
+          if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
           if (has('plexUrl')) {
             let u = (el('plexUrl').value || '').trim();
             if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
@@ -121,6 +125,8 @@
         if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
         if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
+        if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
+        if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
         if (has('plexUrl')) {
           let u = (el('plexUrl').value || '').trim();
           if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u; // normalize
