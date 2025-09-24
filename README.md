@@ -36,15 +36,6 @@ Install Git:
 sudo apt install git -y
 ```
 
-(Optional) Add an SSH key for GitHub:
-
-```bash
-ssh-keygen -t ed25519 -C "your-email@example.com" -f ~/.ssh/id_ed25519
-# don't enter a passphrase when prompted
-cat ~/.ssh/id_ed25519.pub
-```
-Then add the printed key to GitHub: Settings → SSH and GPG keys → New SSH key.
-
 Clone the project:
 
 ```bash
