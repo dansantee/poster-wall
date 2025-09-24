@@ -191,13 +191,14 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--progress-bar-color), var(--progress-bar-color)dd);
+  background-color: var(--progress-bar-color, #F4E88A); /* Fallback color */
   border-radius: clamp(8px, 1vh, 16px);
   transition: width 1s ease;
   box-shadow: 0 0 15px rgba(244, 232, 138, 0.5);
-  min-width: 0; /* Allow it to be completely empty at 0% */
   width: 0%; /* Start at 0%, JavaScript will set the actual width */
-  /* Remove absolute positioning to let it flow naturally */
+  display: block;
+  /* Add a visible border for debugging */
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .now-showing-poster {
