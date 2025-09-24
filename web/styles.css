@@ -186,7 +186,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   overflow: hidden;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
+  /* Remove relative positioning - let it be a normal block */
 }
 
 .now-showing-progress-bar {
@@ -196,11 +196,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   transition: width 1s ease;
   box-shadow: 0 0 15px rgba(244, 232, 138, 0.5);
   min-width: 0; /* Allow it to be completely empty at 0% */
-  position: absolute;
-  left: 0;
-  top: 0;
   width: 0%; /* Start at 0%, JavaScript will set the actual width */
-  display: block; /* Ensure it's visible */
+  /* Remove absolute positioning to let it flow naturally */
 }
 
 .now-showing-poster {
