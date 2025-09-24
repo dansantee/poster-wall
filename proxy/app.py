@@ -305,6 +305,13 @@ def now_playing():
             if not device_match:
                 continue
             
+            # Check if this session is from an excluded library
+            excluded_libraries = srv.get('excludedLibraries', [])
+            if excluded_libraries:
+                library_section_id = str(session.get('librarySectionID', ''))
+                if library_section_id in excluded_libraries:
+                    continue  # Skip sessions from excluded libraries
+            
             # Extract media information
             media_type = session.get('type')
             if media_type not in ['movie', 'episode']:

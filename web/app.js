@@ -57,7 +57,8 @@
       progressBarColor:j.progressBarColor?? '#F4E88A',
       progressBarPadding:j.progressBarPadding?? 1.5,
       progressBarHeight:j.progressBarHeight?? 2.5,
-      plexDevices:   j.plexDevices   ?? []
+      plexDevices:   j.plexDevices   ?? [],
+      excludedLibraries: j.excludedLibraries ?? []
     };
   }
 

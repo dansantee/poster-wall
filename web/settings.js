@@ -36,6 +36,7 @@
       if (has('plexToken'))   el('plexToken').value    = cfg.plexToken ?? '';
       if (has('plexInsecure'))el('plexInsecure').checked = cfg.plexInsecure ?? true;
       if (has('plexDevices')) el('plexDevices').value   = (cfg.plexDevices || []).join('\n');
+      if (has('excludedLibraries')) el('excludedLibraries').value = (cfg.excludedLibraries || []).join(', ');
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
@@ -88,6 +89,12 @@
               .map(line => line.trim())
               .filter(line => line.length > 0);
             next.plexDevices = devices;
+          }
+          if (has('excludedLibraries')) {
+            const libraries = (el('excludedLibraries').value || '').split(',')
+              .map(id => id.trim())
+              .filter(id => id.length > 0);
+            next.excludedLibraries = libraries;
           }
 
           await saveServerCfg(next);
@@ -151,6 +158,12 @@
             .map(line => line.trim())
             .filter(line => line.length > 0);
           next.plexDevices = devices;
+        }
+        if (has('excludedLibraries')) {
+          const libraries = (el('excludedLibraries').value || '').split(',')
+            .map(id => id.trim())
+            .filter(id => id.length > 0);
+          next.excludedLibraries = libraries;
         }
 
         await saveServerCfg(next);
