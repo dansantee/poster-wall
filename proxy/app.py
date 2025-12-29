@@ -312,24 +312,17 @@ def now_playing():
         sessions_data = r.json()
         sessions = sessions_data.get('MediaContainer', {}).get('Metadata', [])
         
+        # Normalize device IPs for comparison (strip whitespace, lowercase)
+        monitored_ips = [device.strip().lower() for device in devices]
+        
         # Look for active sessions on monitored devices
         for session in sessions:
             player = session.get('Player', {})
-            player_address = player.get('address', '')
-            player_title = player.get('title', '').lower()
+            player_address = player.get('address', '').strip().lower()
             
-            # Check if this session is from one of our monitored devices
-            device_match = False
-            for device in devices:
-                device = device.lower().strip()
-                if (device in player_address.lower() or 
-                    device in player_title or
-                    player_address.lower() in device):
-                    device_match = True
-                    break
-            
-            if not device_match:
-                continue
+            # STRICT IP FILTERING: Only match if player IP is in monitored IPs list
+            if player_address not in monitored_ips:
+                continue  # Skip sessions from non-monitored IPs
             
             # Check if this session is from an included library (whitelist approach)
             included_sections = srv.get('sectionId', ['1'])  # Default to section 1 if not configured
@@ -461,6 +454,13 @@ def restart_kiosk():
 
 # ---- Debug (optional) ----
 @app.route('/debug/routes')
+def debug_routes():
+    return '\n'.join(sorted(str(r) for r in app.url_map.iter_rules())), 200, {'Content-Type': 'text/plain'}
+
+if __name__ == '__main__':
+    # pip install flask requests
+    print("Starting Poster Wall Proxy from:", __file__)
+    app.run(host='0.0.0.0', port=8811)
 def debug_routes():
     return '\n'.join(sorted(str(r) for r in app.url_map.iter_rules())), 200, {'Content-Type': 'text/plain'}
 
