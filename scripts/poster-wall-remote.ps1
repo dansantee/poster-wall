@@ -80,7 +80,7 @@ function Invoke-PosterWallCommand {
   if ($result.Output) {
     $result.Output
   }
-  if ($result.Error) {
+  if ($result.Error -and $result.ExitStatus -ne 0) {
     $result.Error | Write-Error
   }
   if (-not $AllowDisconnect -and $result.ExitStatus -ne 0) {

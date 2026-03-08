@@ -415,12 +415,13 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-progress {
   width: 100vw; /* Full viewport width */
   height: var(--progress-bar-height, 2.5vh); /* Use configurable height with fallback */
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(70, 80, 95, 0.82);
   border-radius: 0; /* Remove border radius for full-width bar */
   margin: var(--progress-bar-padding, 1.5vh) 0; /* Use configurable padding with fallback */
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
   /* Remove relative positioning - let it be a normal block */
 }
 
