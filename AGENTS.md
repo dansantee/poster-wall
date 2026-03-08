@@ -30,6 +30,7 @@ There is also:
 - `sectionId` is handled as an array in current code, though the README still shows older single-section examples in places.
 - The project mixes movies and TV shows from configured Plex libraries and shuffles results server-side.
 - The remote deployment workflow pulls from `origin/main` on the Pi. Local commits do not reach the device until they are pushed.
+- There is also a separate direct-to-Pi deploy workflow for local testing. It copies selected local files to the Pi without changing the Pi's git commit.
 
 ## Local Development
 
@@ -60,7 +61,9 @@ The README also documents the Raspberry Pi install path using `setup.sh`.
 - Keep README and docs in sync when behavior, ports, setup, or configuration expectations change.
 - For remote box operations, prefer `scripts/poster-wall-remote.ps1` instead of ad hoc commands. It reads local-only connection details from `SECRETS.md`.
 - Use `scripts/poster-wall-remote.ps1 -Action deploy` to pull the latest pushed code on the Pi and restart the poster services.
+- Use `scripts/poster-wall-remote.ps1 -Action direct-deploy` for fast local testing on the Pi without going through GitHub. This should stay a separate workflow from normal repo deployment.
 - After remote deploys, verify the Pi repo commit and confirm `poster-proxy.service`, `poster-web.service`, and `poster-kiosk.service` are active.
+- After direct deploys, do not rely on the Pi git commit for verification because the working tree may differ from `origin/main`. Verify the affected behavior and confirm the poster services are active.
 
 ## Validation
 

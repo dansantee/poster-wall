@@ -8,6 +8,7 @@
   const imgA  = document.getElementById('posterA');
   const imgB  = document.getElementById('posterB');
   let front = imgA, back = imgB;
+  const previewMode = new URLSearchParams(location.search).get('preview');
 
   // Always talk to the proxy running on this host
   function proxyBase(){ return `${location.protocol}//${location.hostname}:8811`; }
@@ -57,8 +58,11 @@
       nowShowingFontWeight:j.nowShowingFontWeight?? 700,
       nowShowingColor:j.nowShowingColor?? '#F4E88A',
       progressBarColor:j.progressBarColor?? '#F4E88A',
+      progressTrackColor:j.progressTrackColor?? '#788496',
+      progressTrackOpacity:Math.min(1, Math.max(0.1, Number(j.progressTrackOpacity) || 0.92)),
       progressBarPadding:j.progressBarPadding?? 1.5,
       progressBarHeight:j.progressBarHeight?? 2.5,
+      autoDimStrength:Math.min(1, Math.max(0.2, Number(j.autoDimStrength) || 0.5)),
       posterTransitions:!!j.posterTransitions,
       transitionTypes:(j.transitionTypes && Array.isArray(j.transitionTypes)) ? j.transitionTypes : ['crossfade'],
       plexDevices:   j.plexDevices   ?? []
@@ -206,6 +210,16 @@
     return channelMap[channels.toLowerCase()] || null;
   }
 
+  function hexToRgb(hex) {
+    const normalized = (hex || '').replace('#', '');
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
+    return {
+      r: parseInt(normalized.slice(0, 2), 16),
+      g: parseInt(normalized.slice(2, 4), 16),
+      b: parseInt(normalized.slice(4, 6), 16)
+    };
+  }
+
   // ---- font and color settings helper ----
   function applyFontSettings(cfg) {
     const titleEl = document.getElementById('nowShowingTitle');
@@ -273,11 +287,20 @@
     if (cfg.progressBarColor) {
       root.style.setProperty('--progress-bar-color', cfg.progressBarColor);
     }
+    if (cfg.progressTrackColor) {
+      const rgb = hexToRgb(cfg.progressTrackColor);
+      if (rgb) {
+        root.style.setProperty('--progress-track-color', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${cfg.progressTrackOpacity ?? 0.92})`);
+      }
+    }
     if (cfg.progressBarPadding !== undefined) {
       root.style.setProperty('--progress-bar-padding', `${cfg.progressBarPadding}vh`);
     }
     if (cfg.progressBarHeight !== undefined) {
       root.style.setProperty('--progress-bar-height', `${cfg.progressBarHeight}vh`);
+    }
+    if (cfg.autoDimStrength !== undefined) {
+      root.style.setProperty('--poster-dim-brightness', String(cfg.autoDimStrength));
     }
   }
 
@@ -324,6 +347,18 @@
     } catch {
       el.classList.remove('dim');
     }
+  }
+
+  function makePreviewNowPlaying(items) {
+    const item = (items && items.length > 0) ? items[0] : null;
+    return {
+      playing: true,
+      progress: 42,
+      poster: item ? item.poster : '',
+      rating: item ? item.rating : 'PG-13',
+      videoResolution: '4k',
+      audioChannels: '5.1'
+    };
   }
 
   function swap(cfg, src){
@@ -623,16 +658,23 @@
   (async function init(){
     try{
       const cfg = await loadCfg();
-      const items = await fetchItems(cfg);
-      
-      // Apply initial font settings
       applyFontSettings(cfg);
-      
-      // Start poster rotation
+
+      if (previewMode === 'nowplaying') {
+        let previewItems = [];
+        try {
+          previewItems = await fetchItems(cfg);
+        } catch {
+          previewItems = [];
+        }
+        showNowPlaying(makePreviewNowPlaying(previewItems), cfg);
+        return;
+      }
+
+      const items = await fetchItems(cfg);
       startRotation(cfg, items);
-      
-      // Start now playing monitoring if devices are configured
-      if (cfg.plexDevices && cfg.plexDevices.length > 0) {
+
+      if (previewMode !== 'rotation' && cfg.plexDevices && cfg.plexDevices.length > 0) {
         startNowPlayingMonitor(cfg);
       }
     }catch(e){

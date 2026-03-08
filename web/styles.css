@@ -2,8 +2,10 @@
   --bg:#000; --text:#e6e9ef; --muted:#97a1ad; --card:#0c0f14; --accent:#7aa2f7;
   --gap:12px; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.5);
   --now-showing-color: #F4E88A; --progress-bar-color: #F4E88A;
+  --progress-track-color: rgba(120, 132, 150, 0.92);
   --progress-bar-padding: 1.5vh; /* Default padding value */
   --progress-bar-height: 2.5vh; /* Default height value */
+  --poster-dim-brightness: 0.5;
 }
 
 *{box-sizing:border-box}
@@ -326,7 +328,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   transition: opacity 900ms ease, filter 300ms ease;
 }
 .poster.dim {
-  filter: brightness(0.5);
+  filter: brightness(var(--poster-dim-brightness, 0.5));
 }
 
 /* Error display styles */
@@ -415,7 +417,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-progress {
   width: 100vw; /* Full viewport width */
   height: var(--progress-bar-height, 2.5vh); /* Use configurable height with fallback */
-  background: rgba(120, 132, 150, 0.92);
+  background: var(--progress-track-color, rgba(120, 132, 150, 0.92));
   border-radius: 0; /* Remove border radius for full-width bar */
   margin: var(--progress-bar-padding, 1.5vh) 0; /* Use configurable padding with fallback */
   overflow: hidden;

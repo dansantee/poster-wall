@@ -45,6 +45,7 @@
       if (has('plexInsecure'))el('plexInsecure').checked = cfg.plexInsecure ?? true;
       if (has('plexDevices')) el('plexDevices').value   = (cfg.plexDevices || []).join('\n');
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
+      if (has('autoDimStrength')) el('autoDimStrength').value = cfg.autoDimStrength ?? 0.5;
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
@@ -52,6 +53,8 @@
       if (has('nowShowingFontWeight')) el('nowShowingFontWeight').value = cfg.nowShowingFontWeight ?? 700;
       if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
       if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
+      if (has('progressTrackColor')) el('progressTrackColor').value = cfg.progressTrackColor ?? '#788496';
+      if (has('progressTrackOpacity')) el('progressTrackOpacity').value = cfg.progressTrackOpacity ?? 0.92;
       
       // Initialize color pickers with dynamic updates
       initializeColorPickers();
@@ -97,6 +100,7 @@
           }
           if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
           if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
+          if (has('autoDimStrength')) next.autoDimStrength = Math.min(1, Math.max(0.2, Number(el('autoDimStrength').value) || 0.5));
           if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
           if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
@@ -104,6 +108,8 @@
           if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
           if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
           if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+          if (has('progressTrackColor')) next.progressTrackColor = el('progressTrackColor').value || '#788496';
+          if (has('progressTrackOpacity')) next.progressTrackOpacity = Math.min(1, Math.max(0.1, Number(el('progressTrackOpacity').value) || 0.92));
           if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
           if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
           if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
@@ -179,6 +185,7 @@
         }
         if (has('rotateSec'))    next.rotateSec    = Math.max(3, Number(el('rotateSec').value) || 10);
         if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
+        if (has('autoDimStrength')) next.autoDimStrength = Math.min(1, Math.max(0.2, Number(el('autoDimStrength').value) || 0.5));
         if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
         if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
@@ -186,6 +193,8 @@
         if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
         if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
         if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+        if (has('progressTrackColor')) next.progressTrackColor = el('progressTrackColor').value || '#788496';
+        if (has('progressTrackOpacity')) next.progressTrackOpacity = Math.min(1, Math.max(0.1, Number(el('progressTrackOpacity').value) || 0.92));
         if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
         if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
         if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
@@ -259,13 +268,26 @@
         }
       });
     }
+
+    if (has('btnPreviewRotation')) {
+      el('btnPreviewRotation').addEventListener('click', () => {
+        window.open('index.html?preview=rotation', '_blank');
+      });
+    }
+
+    if (has('btnPreviewNowPlaying')) {
+      el('btnPreviewNowPlaying').addEventListener('click', () => {
+        window.open('index.html?preview=nowplaying', '_blank');
+      });
+    }
   }
 
   // Initialize enhanced color pickers with live hex updates
   function initializeColorPickers() {
     const colorPickers = [
       { input: 'nowShowingColor', hex: 'nowShowingColorHex' },
-      { input: 'progressBarColor', hex: 'progressBarColorHex' }
+      { input: 'progressBarColor', hex: 'progressBarColorHex' },
+      { input: 'progressTrackColor', hex: 'progressTrackColorHex' }
     ];
 
     colorPickers.forEach(picker => {
