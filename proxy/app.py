@@ -461,10 +461,3 @@ if __name__ == '__main__':
     # pip install flask requests
     print("Starting Poster Wall Proxy from:", __file__)
     app.run(host='0.0.0.0', port=8811)
-def debug_routes():
-    return '\n'.join(sorted(str(r) for r in app.url_map.iter_rules())), 200, {'Content-Type': 'text/plain'}
-
-if __name__ == '__main__':
-    # pip install flask requests
-    print("Starting Poster Wall Proxy from:", __file__)
-    app.run(host='0.0.0.0', port=8811)
