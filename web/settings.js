@@ -24,10 +24,36 @@
     if (!r.ok) throw new Error(`PUT /api/config ${r.status}`);
   }
 
+  async function loadBuildInfo() {
+    const r = await fetch(`${proxyBase()}/api/build-info`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`GET /api/build-info ${r.status}`);
+    return await r.json();
+  }
+
+  function renderBuildInfo(info) {
+    if (!has('buildInfo')) return;
+    if (info.error) {
+      el('buildInfo').textContent = `Build info unavailable: ${info.error}`;
+      return;
+    }
+    const dirtyLabel = info.dirty ? 'dirty' : 'clean';
+    const statusText = (info.status && info.status.length > 0) ? info.status.join('\n') : 'clean';
+    el('buildInfo').textContent =
+      `Host: ${info.hostname || 'unknown'}\n` +
+      `Commit: ${info.shortCommit || 'unknown'}\n` +
+      `Working tree: ${dirtyLabel}\n` +
+      `Status:\n${statusText}`;
+  }
+
   // ---------- init ----------
   (async function init() {
     try {
       const cfg = await loadServerCfg();
+      try {
+        renderBuildInfo(await loadBuildInfo());
+      } catch (buildError) {
+        renderBuildInfo({ error: String(buildError) });
+      }
 
       // populate (null-safe; fields may be removed from HTML)
       if (has('sectionId'))   {
@@ -141,6 +167,9 @@
           }
 
           await saveServerCfg(next);
+          try {
+            renderBuildInfo(await loadBuildInfo());
+          } catch {}
           alert('Settings saved to server.');
         } catch (e) {
           alert(`Save failed: ${e}`);
@@ -161,6 +190,9 @@
           });
           
           if (r.ok) {
+            try {
+              renderBuildInfo(await loadBuildInfo());
+            } catch {}
             alert('Kiosk restart initiated.');
           } else {
             const err = await r.text();
@@ -226,6 +258,9 @@
         }
 
         await saveServerCfg(next);
+        try {
+          renderBuildInfo(await loadBuildInfo());
+        } catch {}
         alert('Settings saved to server.');
       });
     }

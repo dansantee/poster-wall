@@ -16,6 +16,7 @@ SERVER_TOKEN = os.environ.get('PLEX_TOKEN','').strip()
 # Server-managed config file + admin key
 CFG_PATH = pathlib.Path(os.environ.get("PW_CONFIG_PATH", "config.json"))
 ADMIN_KEY = os.environ.get("PW_ADMIN_KEY", "").strip()
+REPO_DIR = pathlib.Path(__file__).resolve().parents[1]
 
 PLEX_HEADERS = {
     'Accept': 'application/json',
@@ -71,6 +72,42 @@ def insecure_from(req):
         return False
     return bool(srv.get('plexInsecure')) or ALLOW_INSECURE_DEFAULT
 
+def build_info():
+    try:
+        commit = subprocess.run(
+            ["git", "-C", str(REPO_DIR), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True
+        ).stdout.strip()
+        short_commit = subprocess.run(
+            ["git", "-C", str(REPO_DIR), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(REPO_DIR), "status", "--short"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True
+        ).stdout.strip()
+        return {
+            "commit": commit,
+            "shortCommit": short_commit,
+            "dirty": bool(status),
+            "status": status.splitlines() if status else []
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "dirty": None,
+            "status": []
+        }
+
 # ---- CORS ----
 @app.after_request
 def add_cors(resp):
@@ -103,6 +140,13 @@ def get_season_poster(base, token, rating_key, verify_tls=True):
 def ping():
     if request.method == 'OPTIONS': return ('',204)
     return 'pong',200
+
+@app.route('/api/build-info', methods=['GET','OPTIONS'])
+def api_build_info():
+    if request.method == 'OPTIONS': return ('',204)
+    info = build_info()
+    info["hostname"] = socket.gethostname()
+    return jsonify(info)
 
 # ---- Server config (GET/PUT) ----
 @app.route("/api/config", methods=["GET", "OPTIONS"])

@@ -126,7 +126,13 @@ function Invoke-DirectDeploy {
     $remotePath = Convert-ToRemotePath $relativePath
     $remoteDir = Split-Path $remotePath -Parent
     Invoke-PosterWallCommand "mkdir -p '$remoteDir'" | Out-Null
-    Set-SFTPItem -SFTPSession $sftpSession -Path $localPath -Destination $remoteDir -Force | Out-Null
+    $ext = [IO.Path]::GetExtension($localPath).ToLowerInvariant()
+    if ($ext -in @('.py', '.js', '.html', '.css', '.md', '.json', '.txt', '.sh', '.yml', '.yaml')) {
+      $content = Get-Content $localPath -Raw
+      Set-SFTPContent -SFTPSession $sftpSession -Path $remotePath -Value $content -Encoding UTF8 | Out-Null
+    } else {
+      Set-SFTPItem -SFTPSession $sftpSession -Path $localPath -Destination $remoteDir -Force | Out-Null
+    }
     Write-Host "Uploaded $relativePath"
   }
 
