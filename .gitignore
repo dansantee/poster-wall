@@ -1,3 +1,4 @@
 proxy/config.json
 SECRETS.md
+.venv/
 proxy/__pycache__/*
