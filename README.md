@@ -72,6 +72,8 @@ The settings page lets you customize the setup:
 - Change the "Now Showing" text
 - Choose from some fonts
 - Change font sizes, spacing, colors
+- Tune progress bar fill and track appearance
+- Tune auto-dim strength for overly bright posters
 
 **Poster transitions:**
 - Basic crossfade (default)
@@ -86,10 +88,12 @@ The settings page lets you customize the setup:
 - Automatically switches when someone starts watching something
 - Displays resolution badges, audio format, ratings
 - Works with the libraries selected
+- Includes preview buttons on the settings page for idle mode and now-playing mode
 
 **Other features:**
 - Auto-dims overly bright posters, white backgrounds, etc.
 - Works with both movies and TV shows
+- Shows build status on the settings page, including commit and dirty/clean state
 
 ## Development
 
@@ -114,6 +118,23 @@ python app.py
 cd web
 python -m http.server 8088
 ```
+
+## Deploying To The Pi
+
+There are two deployment workflows:
+
+**Normal repo deploy:**
+- Commit and push to `origin/main`
+- On the Pi, pull the latest code and restart services
+- This keeps the Pi aligned with Git history
+
+**Direct test deploy:**
+- Copy selected local files straight to the Pi without going through GitHub
+- Restart services on the Pi
+- This is useful for fast visual iteration on the real display
+- After testing, commit/push and do a normal repo deploy to bring the Pi back into sync
+
+The local helper script for remote operations reads connection details from `SECRETS.md`. A safe template is provided in `SECRETS-EXAMPLE.md`.
 
 ## Notes
 

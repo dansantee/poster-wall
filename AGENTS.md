@@ -31,6 +31,7 @@ There is also:
 - The project mixes movies and TV shows from configured Plex libraries and shuffles results server-side.
 - The remote deployment workflow pulls from `origin/main` on the Pi. Local commits do not reach the device until they are pushed.
 - There is also a separate direct-to-Pi deploy workflow for local testing. It copies selected local files to the Pi without changing the Pi's git commit.
+- The settings page now includes build status, preview buttons for idle/now-playing mode, progress track controls, and auto-dim strength controls.
 
 ## Local Development
 
@@ -64,6 +65,7 @@ The README also documents the Raspberry Pi install path using `setup.sh`.
 - Use `scripts/poster-wall-remote.ps1 -Action direct-deploy` for fast local testing on the Pi without going through GitHub. This should stay a separate workflow from normal repo deployment.
 - After remote deploys, verify the Pi repo commit and confirm `poster-proxy.service`, `poster-web.service`, and `poster-kiosk.service` are active.
 - After direct deploys, do not rely on the Pi git commit for verification because the working tree may differ from `origin/main`. Verify the affected behavior and confirm the poster services are active.
+- `GET /api/build-info` is the lightweight source for the settings-page build indicator and should report hostname, commit, and working-tree state.
 
 ## Validation
 
