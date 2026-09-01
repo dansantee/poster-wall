@@ -11,6 +11,22 @@ There is also:
 
 - `setup.sh`: Pi provisioning/setup entrypoint
 - `docs/systemd-examples.txt`: example service units for the proxy, static web server, and Chromium kiosk
+- `tests/`: pytest suite covering the proxy API plus cross-file contracts (see Validation)
+
+## Read First
+
+Before changing anything, read the doc for the area you are touching. They are
+current and describe real behaviour, including known rough edges:
+
+- `docs/ARCHITECTURE.md`: how the parts fit, kiosk boot sequence, display modes, transitions, auto-dimming, known rough edges
+- `docs/API.md`: every proxy endpoint, its parameters, responses, errors, and the environment variables
+- `docs/CONFIGURATION.md`: every config key with type, default, clamps and quirks
+- `docs/RASPBERRY-PI.md`: what `setup.sh` does, the three services, deploy workflows, troubleshooting
+- `docs/DEVELOPMENT.md`: local dev, preview modes, what must stay in sync across files
+- `docs/TESTING.md`: how to run and extend the suite, and what is deliberately not covered
+
+Keep these in sync when behaviour changes. A change to ports, endpoints, config
+keys, service names or defaults should update the relevant doc in the same edit.
 
 ## Working Style
 
@@ -69,10 +85,35 @@ The README also documents the Raspberry Pi install path using `setup.sh`.
 
 ## Validation
 
-When making changes, prefer lightweight validation:
+Run the test suite for any change to `proxy/`, `web/`, `setup.sh`,
+`scripts/poster-wall-remote.ps1` or `.gitignore`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Create the venv first if it is missing (`py -3 -m venv .venv` then
+`.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt`). The suite
+needs no network and no Plex server, and never touches the real
+`proxy/config.json`.
+
+Half the suite asserts cross-file contracts: element ids matching the HTML,
+transition names matching the CSS, config keys the settings page must be able to
+save, ports agreeing between `setup.sh` and the frontend, and the `SECRETS.md`
+field labels the PowerShell helper parses. A failure there usually means two
+files drifted apart, not that the test is stale — fix the mismatch rather than
+loosening the assertion. Some tests deliberately pin known-quirky behaviour and
+say so in their docstring; if a change makes one fail because the quirk is now
+fixed, update the test and the docs together.
+
+Add tests for new endpoints, new config keys and new transitions. `docs/TESTING.md`
+has the fixtures and patterns.
+
+Beyond that, prefer lightweight validation:
 
 - Run the Flask app if backend logic changed.
-- Serve `web/` locally if frontend behavior changed.
+- Serve `web/` locally if frontend behavior changed; use `index.html?preview=rotation`
+  and `?preview=nowplaying` to check the display without live playback.
 - Sanity-check the settings flow against `/api/config`.
 - If you cannot fully validate hardware-specific behavior on the local machine, say so clearly.
 

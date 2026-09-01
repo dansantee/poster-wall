@@ -2,3 +2,5 @@ proxy/config.json
 SECRETS.md
 .venv/
 proxy/__pycache__/*
+__pycache__/
+.pytest_cache/

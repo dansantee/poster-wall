@@ -2,11 +2,41 @@
 
 Turn your Raspberry Pi into a movie poster kiosk that shows off your Plex library.
 
+Posters rotate on a portrait display like a cinema one-sheet. When someone starts
+playing something on a device you've nominated, the wall switches to a "Now
+Showing" marquee with a live progress bar and format badges, then goes back to
+rotating when playback stops.
+
+## How it works
+
+Three small pieces run on the Pi as user systemd services:
+
+- **`proxy/app.py`** (port 8811) — a Flask proxy that talks to Plex, holds your
+  token, aggregates and shuffles your selected libraries, and stores all settings
+  in `proxy/config.json`
+- **`web/`** (port 8088) — the kiosk page and the settings page, plain HTML/CSS/JS
+  with no build step
+- **Chromium in kiosk mode**, launched by Sway, pointed at the local site
+
+Full picture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Documentation
+
+| Doc | What's in it |
+| --- | --- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces fit, boot sequence, display modes, transitions, auto-dimming, known rough edges |
+| [API.md](docs/API.md) | Every proxy endpoint, parameter, response and error, plus environment variables |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting: type, default, valid range, quirks |
+| [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) | What `setup.sh` does, the services, deploy workflows, troubleshooting |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local dev on Windows, preview modes, what to keep in sync |
+| [TESTING.md](docs/TESTING.md) | Running and extending the test suite |
+
 ## What you need
 
 - Raspberry Pi 5 (4GB) - this is what I've tested on, other models might work
 - Raspberry Pi OS Lite 64-bit (Bookworm)
 - SSH enabled and wifi/ethernet setup
+- A Plex server on the same network
 
 ## Quick setup
 
@@ -50,6 +80,12 @@ chmod +x setup.sh
 ./setup.sh --rotate 90
 ```
 
+It's idempotent — re-run it any time, including with a different `--rotate`
+value. See [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) for exactly what it changes.
+
+Once everything's running, go to `http://your-pi-hostname.local:8088/settings.html`
+to configure the display.
+
 ## Getting your Plex token
 
 You need a Plex token to access your library. Here's how to get it:
@@ -60,7 +96,11 @@ You need a Plex token to access your library. Here's how to get it:
 
 Your Plex URL will be like `http://192.168.1.100:32400` (use your actual Plex server IP).
 
-Once everything's running, go to `http://your-pi-hostname.local:8088/settings.html` to configure the display.
+You'll also need the **section ID** of each library you want to show. Open
+`http://your-plex:32400/library/sections?X-Plex-Token=your-token` and read the
+`key` of each library.
+
+The token is stored in plain text in `proxy/config.json`, which is gitignored.
 
 ## Features
 
@@ -95,6 +135,8 @@ The settings page lets you customize the setup:
 - Works with both movies and TV shows
 - Shows build status on the settings page, including commit and dirty/clean state
 
+Every setting is documented in [CONFIGURATION.md](docs/CONFIGURATION.md).
+
 ## Development
 
 Local dev work:
@@ -119,6 +161,26 @@ cd web
 python -m http.server 8088
 ```
 
+More detail, including the preview modes for iterating on the marquee without
+starting playback, in [DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Tests
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
+225 tests, under a second, no Plex server or network needed. They cover the proxy
+API's behaviour end to end, and — since the frontend has no build step or test
+runner — they also assert the string-level contracts that hold the project
+together: element ids matching the HTML, transition names matching the CSS,
+config keys the settings page must be able to save, ports agreeing between
+`setup.sh` and the JS, and the secret files staying out of git.
+
+Worth running before any deploy. See [TESTING.md](docs/TESTING.md).
+
 ## Deploying To The Pi
 
 There are two deployment workflows:
@@ -134,12 +196,17 @@ There are two deployment workflows:
 - This is useful for fast visual iteration on the real display
 - After testing, commit/push and do a normal repo deploy to bring the Pi back into sync
 
-The local helper script for remote operations reads connection details from `SECRETS.md`. A safe template is provided in `SECRETS-EXAMPLE.md`.
+Both run through `scripts/poster-wall-remote.ps1`, which reads connection details
+from `SECRETS.md`. A safe template is provided in `SECRETS-EXAMPLE.md`. Commands
+and verification steps are in
+[RASPBERRY-PI.md](docs/RASPBERRY-PI.md#deploying-changes).
 
 ## Notes
 
 - I've only tested this on a Pi 5, but other models might work fine
 - If you need different rotations, use different `--rotate` values (0, 90, 180, 270) when running `setup.sh` (it can be run multiple times)
+- Settings take effect on the wall at the next page load — hit "Restart Kiosk"
+  after saving
 
 ## License
 
@@ -150,7 +217,3 @@ This is licensed under Creative Commons Attribution-NonCommercial 4.0.
 Full license: https://creativecommons.org/licenses/by-nc/4.0/
 
 Pull requests welcome!
-
-
-
-
