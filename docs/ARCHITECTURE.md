@@ -62,7 +62,7 @@ The proxy exists for four reasons, and each one is load-bearing:
 init()
  ├─ GET /api/config ................ loadCfg(), normalises + defaults every key
  ├─ applyFontSettings(cfg) ......... writes CSS custom properties on :root
- ├─ if ?preview=nowplaying ......... render a fake session and stop
+ ├─ if ?preview=nowplaying|musicvideo  render a fake session and stop
  ├─ GET /api/movies?start=&size=500  fetchItems(), pages until a short page
  ├─ startRotation(cfg, items) ...... shuffles again client-side, primes poster A,
  │                                   then setInterval(swap, rotateSec * 1000)
@@ -101,9 +101,15 @@ Two things about `nowplaying` mode are worth knowing:
 
 - The rotation `setInterval` is **not** cleared. Posters keep swapping behind the
   hidden `#stage`, and the wall resumes mid-rotation when playback stops.
-- Only the *progress bar* is refreshed on subsequent polls. If someone switches
-  to a different movie without stopping first, the poster and icons stay stale
-  until playback stops and restarts.
+- Subsequent polls only refresh the progress bar **unless the playing item
+  changed** (a different `ratingKey`, e.g. the next video in a playlist). Then
+  the whole screen is re-rendered for the new item.
+- `nowplaying` has a music-video variant. When `/api/now-playing` reports
+  `mediaType: "musicvideo"` (a session from a `musicVideoSectionId` library),
+  `#nowShowing` gets the `music` class. The marquee shows `musicVideoText`, the
+  art is drawn square over a blurred, darkened copy of itself
+  (`#nowShowingBackdrop`), the metadata badges are hidden, and the artist and
+  song are shown below the art.
 
 ## Poster transitions
 

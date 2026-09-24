@@ -27,6 +27,8 @@ that is what the **Restart Kiosk** button is for.
   "autoDim": true,
   "autoDimStrength": 0.5,
   "nowShowingText": "NOW SHOWING",
+  "musicVideoSectionId": ["8"],
+  "musicVideoText": "NOW PLAYING",
   "nowShowingFont": "'Cinzel', serif",
   "nowShowingFontSize": 22,
   "nowShowingFontWeight": 500,
@@ -49,6 +51,7 @@ that is what the **Restart Kiosk** button is for.
 | `plexInsecure` | boolean | `false` | Skip TLS certificate verification on every Plex call. Needed for self-signed certs; leave off for plain `http://`. |
 | `sectionId` | array of strings | `["1"]` | Plex library section IDs to include. Entered comma-separated in the UI. A bare string is still accepted for backward compatibility. Controls **both** the poster rotation and which libraries "Now Playing" reacts to. |
 | `plexDevices` | array of strings | `[]` | IP addresses or hostnames whose playback triggers "Now Showing" mode. One per line in the UI. **Empty disables the feature entirely** — the proxy never even polls Plex. Matched case-insensitively against `Player.address`. |
+| `musicVideoSectionId` | array of strings | `[]` | Library section IDs whose playback uses the music-video layout (album art, artist, song) instead of the movie marquee. Entered comma-separated in the UI; a bare value is accepted. Independent of `sectionId`: a music library does **not** need to be in `sectionId`, and should not be, or its video-frame thumbnails join the poster rotation. |
 
 Finding a section ID: open `http://<plex>:32400/library/sections?X-Plex-Token=<token>`
 and read the `key` attribute of each `Directory`.
@@ -86,6 +89,7 @@ Rec. 601 luma over a 32×32 sample is ≥ 200 of 255.
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `nowShowingText` | string | `"NOW SHOWING"` | The marquee text. This is *all* the text shown — the movie or episode title is not rendered. |
+| `musicVideoText` | string | `"NOW PLAYING"` | The marquee text in music-video mode. Uses the same font, size, kerning, weight and colour settings. Artist and song are rendered below the art. |
 | `nowShowingFont` | string | `"'Bebas Neue', sans-serif"` | A CSS `font-family` value, chosen from the dropdown. Google Fonts options are preloaded by `index.html`; anything else must be installed on the Pi. |
 | `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. UI range 5–20. |
 | `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1. |

@@ -65,6 +65,8 @@
       autoDimStrength:Math.min(1, Math.max(0.2, Number(j.autoDimStrength) || 0.5)),
       posterTransitions:!!j.posterTransitions,
       transitionTypes:(j.transitionTypes && Array.isArray(j.transitionTypes)) ? j.transitionTypes : ['crossfade'],
+      musicVideoSectionId:Array.isArray(j.musicVideoSectionId) ? j.musicVideoSectionId : (j.musicVideoSectionId ? [String(j.musicVideoSectionId)] : []),
+      musicVideoText:j.musicVideoText?? 'NOW PLAYING',
       plexDevices:   j.plexDevices   ?? []
     };
     
@@ -349,9 +351,9 @@
     }
   }
 
-  function makePreviewNowPlaying(items) {
+  function makePreviewNowPlaying(items, musicVideo) {
     const item = (items && items.length > 0) ? items[0] : null;
-    return {
+    const preview = {
       playing: true,
       progress: 42,
       poster: item ? item.poster : '',
@@ -359,6 +361,12 @@
       videoResolution: '4k',
       audioChannels: '5.1'
     };
+    if (musicVideo) {
+      preview.mediaType = 'musicvideo';
+      preview.artist = 'Weezer';
+      preview.trackTitle = 'Buddy Holly';
+    }
+    return preview;
   }
 
   function swap(cfg, src){
@@ -502,6 +510,11 @@
   let rotationInterval = null;
   let nowPlayingInterval = null;
   let currentMode = 'rotation'; // 'rotation' or 'nowplaying'
+  let currentItemKey = null;    // what is on screen in nowplaying mode, to spot a track change
+
+  function nowPlayingKey(data) {
+    return data.ratingKey || data.poster || data.title || null;
+  }
 
   async function checkNowPlaying(cfg) {
     if (!cfg.plexDevices || cfg.plexDevices.length === 0) {
@@ -541,20 +554,33 @@
     const progressBar = document.getElementById('nowShowingProgressBar');
     const poster = document.getElementById('nowShowingPoster');
     const iconsContainer = document.getElementById('nowShowingMetadataIcons');
+    const backdrop = document.getElementById('nowShowingBackdrop');
+    const artistEl = document.getElementById('nowShowingArtist');
+    const songEl = document.getElementById('nowShowingSong');
+    const isMusicVideo = data.mediaType === 'musicvideo';
 
+    nowShowing.classList.toggle('music', isMusicVideo);
     if (titleEl) {
-      titleEl.textContent = cfg.nowShowingText;
+      titleEl.textContent = isMusicVideo ? cfg.musicVideoText : cfg.nowShowingText;
       applyFontSettings(cfg);
     }
     if (progressBar) {
       progressBar.style.width = `${data.progress || 0}%`;
     }
     if (poster && data.poster) poster.src = prox(data.poster);
-    
-    // Clear existing icons
-    if (iconsContainer) {
+    if (artistEl) artistEl.textContent = isMusicVideo ? (data.artist || '') : '';
+    if (songEl) songEl.textContent = isMusicVideo ? (data.trackTitle || data.title || '') : '';
+    if (backdrop) {
+      backdrop.style.backgroundImage = (isMusicVideo && data.poster) ? `url("${prox(data.poster)}")` : '';
+    }
+    currentItemKey = nowPlayingKey(data);
+
+    // Clear existing icons (music videos show artist and song instead)
+    if (iconsContainer && isMusicVideo) {
       iconsContainer.innerHTML = '';
-      
+    } else if (iconsContainer) {
+      iconsContainer.innerHTML = '';
+
       // Create and add icons based on available metadata
       const icons = [];
       
@@ -589,9 +615,10 @@
     const stage = document.getElementById('stage');
     const nowShowing = document.getElementById('nowShowing');
     
-    if (nowShowing) nowShowing.classList.remove('visible');
+    if (nowShowing) nowShowing.classList.remove('visible', 'music');
     if (stage) stage.style.display = 'block';
     currentMode = 'rotation';
+    currentItemKey = null;
   }
 
   function startRotation(cfg, list){
@@ -636,6 +663,10 @@
         showNowPlaying(nowPlayingData, cfg);
       } else if (!nowPlayingData.playing && currentMode === 'nowplaying') {
         showRotation();
+      } else if (nowPlayingData.playing && currentMode === 'nowplaying' &&
+                 nowPlayingKey(nowPlayingData) !== currentItemKey) {
+        // Something else started without a stop in between (next track in a playlist)
+        showNowPlaying(nowPlayingData, cfg);
       } else if (nowPlayingData.playing && currentMode === 'nowplaying') {
         // Update progress bar if still playing
         const progressBar = document.getElementById('nowShowingProgressBar');
@@ -660,14 +691,14 @@
       const cfg = await loadCfg();
       applyFontSettings(cfg);
 
-      if (previewMode === 'nowplaying') {
+      if (previewMode === 'nowplaying' || previewMode === 'musicvideo') {
         let previewItems = [];
         try {
           previewItems = await fetchItems(cfg);
         } catch {
           previewItems = [];
         }
-        showNowPlaying(makePreviewNowPlaying(previewItems), cfg);
+        showNowPlaying(makePreviewNowPlaying(previewItems, previewMode === 'musicvideo'), cfg);
         return;
       }
 

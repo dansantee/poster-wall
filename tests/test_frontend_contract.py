@@ -33,6 +33,9 @@ REQUIRED_INDEX_IDS = {
     "nowShowingProgressBar",
     "nowShowingPoster",
     "nowShowingMetadataIcons",
+    "nowShowingBackdrop",
+    "nowShowingArtist",
+    "nowShowingSong",
 }
 
 # The settings page cannot save without these.
@@ -50,6 +53,9 @@ REQUIRED_SETTINGS_IDS = {
     "btnTry",
     "btnPreviewRotation",
     "btnPreviewNowPlaying",
+    "btnPreviewMusicVideo",
+    "musicVideoSectionId",
+    "musicVideoText",
     "testOut",
 }
 
@@ -356,6 +362,7 @@ def test_the_proxy_defaults_the_keys_the_kiosk_needs_before_first_save(source):
 # --------------------------------------------------------------------------
 DEFAULTS = [
     ("nowShowingText", "'NOW SHOWING'"),
+    ("musicVideoText", "'NOW PLAYING'"),
     ("nowShowingFont", "\"'Bebas Neue', sans-serif\""),
     ("nowShowingFontSize", "9"),
     ("nowShowingKerning", "0.1"),
@@ -412,6 +419,26 @@ def test_the_minimum_rotation_interval_is_consistent(source):
     assert 'min="3"' in source(SETTINGS_HTML)
     assert "Math.max(3, Number(j.rotateSec)" in source(APP_JS)
     assert "Math.max(3, Number(el('rotateSec').value)" in source(SETTINGS_JS)
+
+
+def test_music_video_mode_is_driven_by_the_proxy_media_type(source):
+    """The proxy labels music videos "musicvideo"; the kiosk and CSS key off that."""
+    assert '"musicvideo"' in source(PROXY_PY) or "'musicvideo'" in source(PROXY_PY)
+    assert "data.mediaType === 'musicvideo'" in source(APP_JS)
+    assert ".now-showing.music " in source(STYLES_CSS)
+    assert "classList.toggle('music'" in source(APP_JS)
+
+
+def test_the_kiosk_rerenders_when_the_playing_item_changes(source):
+    """A playlist moves to the next video without a stop; the wall must follow."""
+    app_js = source(APP_JS)
+    assert "nowPlayingKey(nowPlayingData) !== currentItemKey" in app_js
+    assert '"ratingKey": rating_key' in source(PROXY_PY)
+
+
+def test_music_video_preview_mode_exists(source):
+    assert "preview=musicvideo" in source(SETTINGS_JS)
+    assert "previewMode === 'musicvideo'" in source(APP_JS)
 
 
 def test_auto_dim_threshold_is_pinned(source):

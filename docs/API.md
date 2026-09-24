@@ -227,8 +227,9 @@ status code, the upstream `Content-Type` (defaulting to `image/jpeg`) and
 ## `GET /api/now-playing`
 
 Reports playback, but **only** from the device addresses listed in
-`plexDevices` and **only** from libraries listed in `sectionId`. Both filters are
-whitelists; anything unlisted is invisible to the wall.
+`plexDevices` and **only** from libraries listed in `sectionId` or
+`musicVideoSectionId`. Both filters are whitelists; anything unlisted is
+invisible to the wall.
 
 The kiosk polls this every 5 seconds, so it always answers `200` — upstream
 problems are reported in the body, not as an HTTP error.
@@ -262,7 +263,10 @@ contacts Plex at all.
   "audioCodec": "EAC3",
   "audioChannels": "6.1",
   "playerTitle": "Bedroom",
-  "mediaType": "episode"
+  "mediaType": "episode",
+  "ratingKey": "202",
+  "artist": "",
+  "trackTitle": ""
 }
 ```
 
@@ -274,13 +278,20 @@ contacts Plex at all.
 | `videoCodec`, `audioCodec` | Uppercased |
 | `audioChannels` | `"<n>.0"` for mono/stereo, `"<n>.1"` above that, `""` when unknown. Plex counts LFE, so a 5.1 track arrives as 6 channels and is reported as `6.1`; `app.js` maps that back to the 5.1 icon |
 | `poster` | Relative proxy URL, or `null` if no artwork could be found |
-| `mediaType` | `movie` or `episode` |
+| `mediaType` | `movie`, `episode`, or `musicvideo` for a session from a `musicVideoSectionId` library |
+| `ratingKey` | Plex's id for the playing item. The kiosk compares it between polls to notice a playlist moving to the next item without a stop |
+| `artist`, `trackTitle` | Music videos only (empty otherwise): the title split on its first `" - "`. A title with no separator is all `trackTitle` |
 
 **Filtering order** — a session must pass all of these:
 
 1. `Player.address` is in `plexDevices` (compared lowercased and stripped)
-2. `librarySectionID` is in `sectionId` (compared as strings)
-3. `type` is `movie` or `episode`
+2. `librarySectionID` is in `sectionId` or `musicVideoSectionId` (compared as strings)
+3. `type` is `movie` or `episode` (music videos in an "Other Videos" library arrive as `movie`)
+
+**Music video artwork** is the session `thumb`, i.e. the item's Plex poster. An
+"Other Videos" library has no metadata agent, so that poster is a video frame
+unless an `Artist - Title.jpg` sidecar sits next to the video file; Plex then
+uses the sidecar. The kiosk draws the art square over a blurred copy of itself.
 
 The first session that passes wins. Everything else is ignored.
 

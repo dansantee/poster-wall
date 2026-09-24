@@ -224,6 +224,102 @@ def test_a_movie_without_artwork_has_no_poster(client, monitored):
 
 
 # --------------------------------------------------------------------------
+# Music videos (musicVideoSectionId)
+# --------------------------------------------------------------------------
+MUSIC_VIDEO_SESSION = {
+    "type": "movie",
+    "subtype": "clip",
+    "title": "Weezer - Buddy Holly",
+    "year": 2026,
+    "duration": 241186,
+    "viewOffset": 60296,
+    "ratingKey": "239589",
+    "thumb": "/library/metadata/239589/thumb/1790221703",
+    "librarySectionID": 8,
+    "Player": {"address": DEVICE, "title": "Xbox"},
+    "Media": [{"videoResolution": "1080", "videoCodec": "h264", "Part": []}],
+}
+
+
+@pytest.fixture
+def music_monitored(write_cfg, plex):
+    """Movies (1) in the rotation, Music Videos (8) as a music video library."""
+    write_cfg(
+        plexUrl=BASE,
+        plexToken="tok123",
+        plexDevices=[DEVICE],
+        sectionId=["1"],
+        musicVideoSectionId=["8"],
+    )
+    return plex
+
+
+def test_music_video_library_is_reported_as_a_music_video(client, music_monitored):
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["playing"] is True
+    assert body["mediaType"] == "musicvideo"
+    assert body["artist"] == "Weezer"
+    assert body["trackTitle"] == "Buddy Holly"
+    assert body["title"] == "Weezer - Buddy Holly"
+    assert body["progress"] == 25.0
+
+
+def test_music_video_art_is_the_item_poster(client, music_monitored):
+    """The album-art sidecar becomes the Plex poster, so no metadata lookup is needed."""
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert "239589%2Fthumb%2F1790221703" in body["poster"]
+    assert music_monitored.calls_matching(METADATA) == []
+
+
+def test_music_video_title_splits_on_the_first_separator_only(client, music_monitored):
+    body = playing(
+        client,
+        music_monitored,
+        session(template=MUSIC_VIDEO_SESSION, title="The Rookie - Daddy Cop - Part 2"),
+    )
+    assert body["artist"] == "The Rookie"
+    assert body["trackTitle"] == "Daddy Cop - Part 2"
+
+
+def test_music_video_without_a_separator_is_all_title(client, music_monitored):
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION, title="Intro"))
+    assert body["artist"] == ""
+    assert body["trackTitle"] == "Intro"
+
+
+def test_music_video_library_does_not_need_to_be_in_section_id(client, music_monitored):
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["playing"] is True
+
+
+def test_music_video_library_is_off_by_default(client, monitored):
+    body = playing(client, monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["playing"] is False
+
+
+def test_a_scalar_music_video_section_is_accepted(client, write_cfg, plex):
+    write_cfg(plexUrl=BASE, plexToken="tok123", plexDevices=[DEVICE], musicVideoSectionId=8)
+    body = playing(client, plex, session(template=MUSIC_VIDEO_SESSION))
+    assert body["mediaType"] == "musicvideo"
+
+
+def test_movies_still_report_as_movies_alongside_music_videos(client, music_monitored):
+    body = playing(client, music_monitored, session())
+    assert body["mediaType"] == "movie"
+    assert body["artist"] == ""
+    assert body["trackTitle"] == ""
+
+
+def test_the_rating_key_is_returned_so_the_kiosk_can_spot_a_track_change(client, music_monitored):
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["ratingKey"] == "239589"
+
+
+def test_movies_return_their_rating_key_too(client, monitored):
+    assert playing(client, monitored, session())["ratingKey"] == "101"
+
+
+# --------------------------------------------------------------------------
 # Progress
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize(

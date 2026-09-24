@@ -372,18 +372,35 @@ def now_playing():
             included_sections = srv.get('sectionId', ['1'])  # Default to section 1 if not configured
             if not isinstance(included_sections, list):
                 included_sections = [included_sections]  # Convert single value to list for backward compatibility
-            
+            included_sections = [str(s) for s in included_sections]
+
+            # Music video libraries take over the wall with album-art layout. They are
+            # separate from sectionId so they never join the poster rotation.
+            music_sections = srv.get('musicVideoSectionId', [])
+            if not isinstance(music_sections, list):
+                music_sections = [music_sections]
+            music_sections = [str(s).strip() for s in music_sections if str(s).strip()]
+
             library_section_id = str(session.get('librarySectionID', ''))
-            if library_section_id not in included_sections:
+            is_music_video = library_section_id in music_sections
+            if library_section_id not in included_sections and not is_music_video:
                 continue  # Skip sessions from non-included libraries
-            
+
             # Extract media information
             media_type = session.get('type')
             if media_type not in ['movie', 'episode']:
                 continue  # Skip music, photos, etc.
-            
+
             # Get detailed media info
             title = session.get('title', 'Unknown Title')
+            artist = ''
+            track_title = ''
+            if is_music_video:
+                # Music videos are "Artist - Title" files in an Other Videos library.
+                artist, sep, track_title = title.partition(' - ')
+                if not sep:
+                    artist, track_title = '', title
+                media_type = 'musicvideo'
             if media_type == 'episode':
                 show_title = session.get('grandparentTitle', '')
                 season_episode = f"S{session.get('parentIndex', '?')}E{session.get('index', '?')}"
@@ -411,7 +428,8 @@ def now_playing():
                         session.get('grandparentThumb')  # show art
                     )
             else:
-                # For movies, use the movie's own poster
+                # For movies, use the movie's own poster. For music videos this is the
+                # album-art sidecar ("Artist - Title.jpg") Plex picked up as the poster.
                 thumb = session.get('thumb')
             
             # Last resort: use episode thumb (might be a frame) - only if nothing else worked
@@ -464,7 +482,10 @@ def now_playing():
                 "audioCodec": audio_codec,
                 "audioChannels": audio_channels,
                 "playerTitle": player.get('title', ''),
-                "mediaType": media_type
+                "mediaType": media_type,
+                "ratingKey": rating_key,
+                "artist": artist,
+                "trackTitle": track_title
             })
         
         return jsonify({"playing": False, "message": "No active sessions on monitored devices"})

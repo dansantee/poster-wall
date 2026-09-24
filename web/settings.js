@@ -73,6 +73,11 @@
       if (has('autoDim'))     el('autoDim').checked    = !!cfg.autoDim;
       if (has('autoDimStrength')) el('autoDimStrength').value = cfg.autoDimStrength ?? 0.5;
       if (has('nowShowingText')) el('nowShowingText').value = cfg.nowShowingText ?? 'NOW SHOWING';
+      if (has('musicVideoSectionId')) {
+        const music = cfg.musicVideoSectionId;
+        el('musicVideoSectionId').value = Array.isArray(music) ? music.join(', ') : (music ?? '');
+      }
+      if (has('musicVideoText')) el('musicVideoText').value = cfg.musicVideoText ?? 'NOW PLAYING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
       if (has('nowShowingKerning')) el('nowShowingKerning').value = cfg.nowShowingKerning ?? 0.1;
@@ -128,6 +133,10 @@
           if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
           if (has('autoDimStrength')) next.autoDimStrength = Math.min(1, Math.max(0.2, Number(el('autoDimStrength').value) || 0.5));
           if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
+          if (has('musicVideoSectionId')) next.musicVideoSectionId = (el('musicVideoSectionId').value || '').split(',')
+            .map(id => id.trim())
+            .filter(id => id.length > 0);
+          if (has('musicVideoText')) next.musicVideoText = (el('musicVideoText').value || 'NOW PLAYING').trim();
           if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
           if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
@@ -219,6 +228,10 @@
         if (has('autoDim'))      next.autoDim      = !!el('autoDim').checked;
         if (has('autoDimStrength')) next.autoDimStrength = Math.min(1, Math.max(0.2, Number(el('autoDimStrength').value) || 0.5));
         if (has('nowShowingText')) next.nowShowingText = (el('nowShowingText').value || 'NOW SHOWING').trim();
+        if (has('musicVideoSectionId')) next.musicVideoSectionId = (el('musicVideoSectionId').value || '').split(',')
+          .map(id => id.trim())
+          .filter(id => id.length > 0);
+        if (has('musicVideoText')) next.musicVideoText = (el('musicVideoText').value || 'NOW PLAYING').trim();
         if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
         if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
@@ -313,6 +326,12 @@
     if (has('btnPreviewNowPlaying')) {
       el('btnPreviewNowPlaying').addEventListener('click', () => {
         window.open('index.html?preview=nowplaying', '_blank');
+      });
+    }
+
+    if (has('btnPreviewMusicVideo')) {
+      el('btnPreviewMusicVideo').addEventListener('click', () => {
+        window.open('index.html?preview=musicvideo', '_blank');
       });
     }
   }
