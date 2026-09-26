@@ -529,39 +529,59 @@ def test_a_song_change_in_the_music_layout_goes_through_the_transition(source):
     app_js = source(APP_JS)
     tick = app_js[app_js.index("async function tick()"):]
     assert "if (trackAnimating) {" in tick[:200], "the poll loop waits for a running transition"
-    assert "await changeTrack(nowPlayingData, cfg);" in tick
+    assert "await changeTrack(nowPlayingData, cfg, () => checkNowPlaying(cfg));" in tick
     change = app_js[app_js.index("function changeTrack"):app_js.index("async function settleTrack")]
     assert "String(lastUpNext[0].ratingKey) === String(data.ratingKey)" in change
-    assert "animateAdvance(data, cfg) : animateCrossfade(data, cfg)" in change
+    assert "animateAdvance(data, cfg, askAgain) : animateCrossfade(data, cfg)" in change
     assert "data.mediaType !== 'musicvideo'" in change, "movies/TV keep the instant swap"
     css = source(STYLES_CSS)
     assert ".now-showing-fly {" in css and "transform-origin: top left;" in css
 
 
-def test_the_new_third_tile_fades_in_with_the_slide_not_after_it(source):
-    """Dan: the third tile "kind of fades and slides" after the rest, like an extra step. It now
-    only fades, during the slide when it's known, else as soon as the queue answers."""
+def test_the_new_third_tile_slides_in_with_the_row(source):
+    """Dan: the third tile faded and slid in after the rest, like an extra step; then: slide it
+    "at the same pace as the other two", with the current song's fly-up going right away and
+    the row waiting "as needed" for the queue's third item, "so what's up top is always
+    correct"."""
     app_js = source(APP_JS)
     assert "upNextEnterLast" not in app_js and "translateX(4vw)" not in app_js
     advance = app_js[app_js.index("async function animateAdvance"):app_js.index("async function animateCrossfade")]
-    fade = advance[advance.index("if (incoming) {"):advance.index("const track = document.querySelector")]
-    assert "entering.animate([{ opacity: 0 }, { opacity: 1 }]" in fade
-    assert "anims.push(" in fade, "part of the advance, so it runs with the slide"
-    assert "gridArea" in fade
+    # The top animations start before any wait for the queue.
+    wait = advance.index("await waitForUpNext(data, askAgain)")
+    assert advance.index("anims.push(fly.animate(") < wait
+    assert advance.index("anims.push(track.animate(") < wait
+    assert "if (!known && tiles.length === 3 && data.upNextPending && askAgain) {" in advance
+    # The row: the same slide options for the two leaving tiles and the entering one.
+    row = advance[wait:advance.index("await Promise.all(anims.map(a => a.finished));")]
+    assert "const slide = { duration: TRACK_ANIM_MS * 0.75, delay: 60, easing: TRACK_EASE };" in row
+    assert "[{ transform: 'translateX(0)' }, { transform: `translateX(${-step}px)` }], { ...slide, fill: 'forwards' }" in row
+    assert "entering.animate([{ transform: `translateX(${step}px)` }, { transform: 'none' }]" in row
+    assert "{ ...slide, fill: 'backwards' }" in row and "gridArea" in row
+    assert "opacity" not in row, "slides, no fade"
+    # The wait is bounded, polls, and gives up if the song changed or stopped.
+    helper = app_js[app_js.index("async function waitForUpNext"):app_js.index("async function animateAdvance")]
+    assert "const until = Date.now() + THIRD_WAIT_MS;" in helper
+    assert "String(fresh.ratingKey) !== String(data.ratingKey)) return null;" in helper
+    assert "if (!fresh.upNextPending || (fresh.upNext || []).length >= 3) return fresh.upNext || [];" in helper
+    assert "const THIRD_WAIT_MS = 1000;" in app_js
+    # Later still: renderUpNext slides tiles that extend the row in, at the same pace.
     render = app_js[app_js.index("function renderUpNext"):app_js.index("// ---- song-change transition")]
     assert "const grows = before.length > 0 && before.length < list.length" in render
-    assert "tile.animate([{ opacity: 0 }, { opacity: 1 }]" in render
-    # Astra pass 1: the late third item arrives by poll, so the first poll after a change is
-    # soon (a full POLL_MS after the transition put it ~1.8 s late), and a crossfade still
-    # fades its third tile in.
+    assert "tile.animate([{ transform: `translateX(${step}px)` }, { transform: 'none' }]" in render
+    assert "{ duration: TRACK_ANIM_MS * 0.75, easing: TRACK_EASE }" in render
+    # Astra pass 1 (earlier): a late third item arrives by poll, so the first poll after a
+    # change is soon, and a crossfade still fades its third tile in.
     assert "const AFTER_CHANGE_POLL_MS = 250;" in app_js
     tick = app_js[app_js.index("async function tick()"):]
-    change = tick[tick.index("await changeTrack(nowPlayingData, cfg);"):]
+    change = tick[tick.index("await changeTrack(nowPlayingData, cfg, () => checkNowPlaying(cfg));"):]
     assert change.index("setTimeout(tick, AFTER_CHANGE_POLL_MS)") < change.index("return;") < change.index("} else {")
     crossfade = app_js[app_js.index("async function animateCrossfade"):app_js.index("function holdForNextItem")]
     assert "await settleTrack(data, cfg, anims, true);" in crossfade
     # Astra pass 2: the fade starts as the row is drawn, before the (up to 500 ms) decode wait.
     settle = app_js[app_js.index("async function settleTrack"):app_js.index("async function animateAdvance")]
+    # Conveyor pass 1: a crossfade's row is new content, so renderUpNext's "row grows" slide
+    # must not also run on it (the third tile would slide and fade at once).
+    assert settle.index("if (fadeThirdTile) lastUpNext = [];") < settle.index("showNowPlaying(data, cfg);")
     assert (settle.index("showNowPlaying(data, cfg);")
             < settle.index("third.animate([{ opacity: 0 }, { opacity: 1 }]")
             < settle.index("await Promise.race([poster.decode()"))

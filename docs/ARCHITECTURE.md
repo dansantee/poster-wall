@@ -244,14 +244,23 @@ Two things about `nowplaying` mode are worth knowing:
       tile's box to none over 800 ms. The old art fades and shrinks, the other
       two tiles slide one slot left, and the text fades out. The new content
       then goes in and the song/artist text rises into place.
-    - The new third tile only fades. If the queue's third item is already known,
-      it fades into slot 3 during the slide: a temporary tile pinned to grid
-      cell `1 / 3` over the leaving one, discarded when the row is re-rendered.
-      On real Plex it usually isn't known yet (the proxy carries over two items
-      and the lookup adds the third ~0.25 s later), so the kiosk polls again
-      250 ms after the transition (`AFTER_CHANGE_POLL_MS`) and `renderUpNext`
-      fades in any tiles that extend the row already on screen (matched by
-      `ratingKey`).
+    - The row moves like a conveyor: the two remaining tiles slide one slot
+      left and the new third slides in from the right edge, all with the same
+      distance, duration and easing. The new tile is a temporary one pinned to
+      grid cell `1 / 3` alongside the leaving one, discarded when the row is
+      re-rendered.
+    - The top never waits; the row may. On real Plex the new song is usually
+      published before its queue lookup answers (the proxy carries over two
+      items and sets `upNextPending`; the lookup adds the third ~0.25 s later).
+      Then the cover flies up at once, and the row holds, with its first slot
+      empty, while `waitForUpNext()` asks the proxy again every 150 ms for up to
+      1 s (`THIRD_WAIT_MS`), so all three slide together. It gives up early if
+      the song changes or stops, or the proxy's answer has fewer than three
+      (the end of the queue).
+    - If the answer comes later still, the two slide on their own, the kiosk
+      polls again 250 ms after the transition (`AFTER_CHANGE_POLL_MS`), and
+      `renderUpNext` slides in any tiles that extend the row already on screen
+      (matched by `ratingKey`) at the same pace.
     - Any other change (a skip, a queue we don't know) crossfades the art and
       text instead, and the third tile fades in with the new content.
     - The fly is appended to `#nowShowing`, so it's excluded from the

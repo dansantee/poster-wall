@@ -626,6 +626,26 @@ def test_until_the_new_item_is_looked_up_the_rest_of_the_old_list_is_shown():
     m.refresh(CFG)
     assert seen_during_lookup[1]["upNext"] == KEYED_UP[1:]
     assert [i["ratingKey"] for i in m.snapshot()["upNext"]] == ["7", "8", "9"], "then the real list"
+    # The kiosk holds the row's slide for a pending third item, so it must be told which is
+    # which: a carried-over list vs a queue that really has only two left.
+    assert seen_during_lookup[1]["upNextPending"] is True
+    assert m.snapshot()["upNextPending"] is False
+
+
+def test_a_cached_up_next_list_is_not_pending():
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=with_queue([UP[:1]])[0])
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.refresh(CFG)                                   # served from the cache, no lookup
+    assert m.snapshot()["upNext"] == UP[:1]
+    assert m.snapshot()["upNextPending"] is False, "a one-item queue is the real answer"
+
+
+def test_a_lagging_lookup_stays_pending():
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=with_queue([None])[0])
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    assert m.snapshot()["upNextPending"] is True, "not answered yet; the next refresh retries"
 
 
 def test_an_item_seen_only_by_polling_also_gets_the_rest_of_the_old_list():
@@ -637,6 +657,7 @@ def test_an_item_seen_only_by_polling_also_gets_the_rest_of_the_old_list():
     assert m.snapshot()["upNext"] == KEYED_UP[2:]
     m.refresh(CFG)
     assert m.snapshot()["upNext"] == KEYED_UP[2:], "Astra pass 2: and it lasts past one refresh"
+    assert m.snapshot()["upNextPending"] is True, "carried over, not this item's own answer"
 
 
 def test_an_end_of_queue_lookup_is_not_replaced_by_the_old_list():

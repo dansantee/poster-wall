@@ -256,7 +256,7 @@ class NowPlayingMonitor:
         body = dict(body)
         lookup = None
         if body.get("playing"):
-            body["upNext"], lookup = self._known_upcoming(body)
+            body["upNext"], lookup, body["upNextPending"] = self._known_upcoming(body)
             self._remember_up_next(body)
         self._publish(body, sessions)
         # The playback state is published first: a slow queue lookup must never hold back the
@@ -266,7 +266,7 @@ class NowPlayingMonitor:
             if items is not None:
                 with self._lock:
                     if self._body and self._body.get("ratingKey") == body.get("ratingKey"):
-                        self._body = dict(self._body, upNext=items)
+                        self._body = dict(self._body, upNext=items, upNextPending=False)
                 self._remember_up_next(dict(body, upNext=items))
 
     def _remember_up_next(self, body):
@@ -292,13 +292,16 @@ class NowPlayingMonitor:
             self._sessions = dict(sessions)
 
     def _known_upcoming(self, body):
-        """(upNext to publish now, (queueID, itemID) still to look up or None).
+        """(upNext to publish now, (queueID, itemID) still to look up or None, pending).
 
         Sessions don't say which play queue they belong to; notifications do, keyed by the
         player's clientIdentifier (= the body's playerId). The queue position is used only if
         the notification was about the item that is playing now (Astra pass 1 #3): after a
         change seen only by polling, a stale position would list the new item as its own
         "up next".
+
+        ``pending`` is True while the list isn't this item's own answer (carried over from
+        the last item, or not looked up yet): the kiosk may wait briefly for the rest.
         """
         with self._lock:
             entry = self._queues.get(body.get("playerId"))
@@ -306,14 +309,14 @@ class NowPlayingMonitor:
             remaining = self._remaining(body)
             if (not entry or self._queue_fetch is None
                     or entry[2] != str(body.get("ratingKey", ""))):
-                return remaining, None
+                return remaining, None, bool(remaining)
             key = entry[:2]
             cached = self._up_next.get(key)
         if cached is not None:
-            return cached, None
+            return cached, None, False
         # Not looked up yet: keep what we had for this same item rather than blanking the row.
         same_item = prev and prev.get("ratingKey") == body.get("ratingKey")
-        return (list(prev.get("upNext") or []) if same_item else remaining), key
+        return (list(prev.get("upNext") or []) if same_item else remaining), key, True
 
     def _remaining(self, body):
         """What followed this item in the player's last known up-next list (``[]`` if it wasn't

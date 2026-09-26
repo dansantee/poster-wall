@@ -278,7 +278,8 @@ contacts Plex at all.
   "upNext": [
     { "ratingKey": "203", "title": "Severance - S1E3 - In Perpetuity", "artist": "", "trackTitle": "Severance - S1E3 - In Perpetuity",
       "shortTitle": "Severance - S1E3 - In Perpetuity", "poster": "/api/poster?…&w=400&h=400&…" }
-  ]
+  ],
+  "upNextPending": false
 }
 ```
 
@@ -297,6 +298,7 @@ contacts Plex at all.
 | `artist`, `trackTitle` | Music videos only (empty otherwise): the title split on its first `" - "`. A title with no separator is all `trackTitle` |
 | `playerId` | The player's `machineIdentifier`. Plex's notifications identify players by it (as `clientIdentifier`), which is how the monitor finds the session's play queue |
 | `upNext` | Only from the monitor's cache (absent on the direct path). Up to 3 items after the current one in the player's Plex play queue, in queue order (so shuffle is respected). Each item has `ratingKey` (so the kiosk can tell when the first one starts, and animate it into place), `title`, `artist`/`trackTitle` (split as above for music-video libraries; otherwise `artist` is empty and `trackTitle` is the whole title), `shortTitle` (`trackTitle` without trailing bracketed extras or "ft./feat./featuring …", for the up-next tiles) and a 400×400 `poster`. `[]` when nothing more is queued or the queue isn't known yet. The kiosk also uses a non-empty list as its sign that another item is coming: when the session disappears it waits up to 8 s instead of 3 s (see ARCHITECTURE.md) |
+| `upNextPending` | Only from the monitor (absent on the direct path). `true` while `upNext` isn't this item's own queue answer yet: the list carried over from the previous item (what followed this one there) while the lookup is pending, or a change seen by polling before its notification. `false` once looked up, including a real end-of-queue list. The kiosk's song-change animation holds the up-next row (not the art) for up to 1 s while it's `true`, so the new third tile can slide in with the others |
 
 **Filtering order** — a session must pass all of these:
 
