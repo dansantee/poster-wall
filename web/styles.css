@@ -542,7 +542,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   overflow: hidden;
 }
 
-.now-showing > :not(.now-showing-backdrop):not(.now-showing-pause):not(.now-showing-fly) {
+.now-showing > :not(.now-showing-backdrop):not(.now-showing-pause):not(.now-showing-fly):not(.now-showing-popup) {
   position: relative;
   z-index: 1;
 }
@@ -702,6 +702,61 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   transform-origin: top left;
   will-change: transform;
   pointer-events: none;
+}
+
+/* Pop-Up Video style fact bubbles over the music art (app.js updatePopup). app.js places the
+   bubble in a corner of the art and pops it in and out with transforms; the tail points into
+   the art and the pop grows out of the tail. */
+.now-showing-popup {
+  display: none;
+  position: fixed;
+  z-index: 2;
+  padding: 0.7em 0.95em;
+  border-radius: 1.1em;
+  background: #fff;
+  color: #111;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  font-size: clamp(18px, 4vw, 72px);
+  font-weight: 700;
+  line-height: 1.25;
+  box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.now-showing-popup.showing {
+  display: block;
+}
+
+.now-showing-popup::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Top-right of the art: tail from the bottom-left, pointing down into the art. */
+.now-showing-popup.corner-tr {
+  transform-origin: 1.8em calc(100% + 0.9em);
+}
+
+.now-showing-popup.corner-tr::after {
+  left: 1.4em;
+  top: 100%;
+  border-width: 0.9em 0.35em 0 0.9em;
+  border-color: #fff transparent transparent transparent;
+}
+
+/* Bottom-left of the art: tail from the top-right, pointing up into the art. */
+.now-showing-popup.corner-bl {
+  transform-origin: calc(100% - 1.8em) -0.9em;
+}
+
+.now-showing-popup.corner-bl::after {
+  right: 1.4em;
+  bottom: 100%;
+  border-width: 0 0.9em 0.9em 0.35em;
+  border-color: transparent transparent #fff transparent;
 }
 
 .now-showing.music .now-showing-upnext {

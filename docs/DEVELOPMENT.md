@@ -59,6 +59,8 @@ parameter:
 
 Either now-playing preview also takes `&state=paused` (the pause dim and badge)
 or `&state=loading` (the spinner shown while waiting for a queue's next item).
+`?preview=musicvideo&demo=popup` shows the fun-fact bubbles with four hardcoded
+facts on a shortened clock (the first at 3 s, then every 12 s).
 `?preview=musicvideo&demo=advance` plays the song-change transition every 5 s,
 rotating through the preview's items. A screenshot can't show motion, so to
 check it headlessly, capture frames over the DevTools protocol at a few moments

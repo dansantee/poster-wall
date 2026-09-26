@@ -266,6 +266,16 @@ Two things about `nowplaying` mode are worth knowing:
     - The fly is appended to `#nowShowing`, so it's excluded from the
       `.now-showing > *` rule that makes children `position: relative`;
       otherwise it lands in the flow and pushes the art down.
+  - **Fun-fact bubbles** (Pop-Up Video style). A music item's `facts` (a list
+    of short strings; none means no bubbles) pop up over a corner of the art,
+    alternating top-right and bottom-left, with a white balloon whose tail
+    points into the art and a "bloop" scale pop in and out. The first comes at
+    15 s, then one per 35 s slot, each held for its reading time (2 s plus 15
+    characters a second). `updatePopup()` runs on the progress tick from the
+    playback position, so a pause holds a bubble and a seek picks that slot's
+    fact. Nothing starts in a song's last 15 s or during a song change, and the
+    old song's bubble pops out when a change starts. The proxy doesn't send
+    `facts` yet; only `?preview=musicvideo&demo=popup` has them.
   - The wall is **1080p portrait (1080×1920, scale 1.0) at 60 Hz** on a 4K TV,
     which upscales. At 4K the Pi 5 drew only 15-20 fps (see RASPBERRY-PI.md,
     `--mode`). Most font sizes are `clamp(min, Nvw, max)`, which hit their pixel

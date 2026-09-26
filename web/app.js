@@ -702,6 +702,7 @@
     currentItemKey = null;
     playback = null;
     queueHasMore = false;
+    resetPopups([]);
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
   }
 
@@ -836,6 +837,7 @@
     }
     const advancing = lastUpNext.length > 0 && lastUpNext[0].ratingKey &&
                       String(lastUpNext[0].ratingKey) === String(data.ratingKey);
+    popOutPopup();   // the old song's bubble goes as its art does
     trackAnimating = true;
     return (advancing ? animateAdvance(data, cfg, askAgain) : animateCrossfade(data, cfg))
       .catch(err => { console.warn('Track transition failed:', err); showNowPlaying(data, cfg); })
@@ -1012,6 +1014,7 @@
       anchorOffset = positionMs();
       anchorAt = Date.now();
     }
+    if (newItem) resetPopups(data.mediaType === 'musicvideo' ? data.facts : []);
     playback = {
       key, state,
       offset: anchorOffset,
@@ -1049,6 +1052,92 @@
   function renderProgress() {
     const bar = document.getElementById('nowShowingProgressBar');
     if (bar && playback) bar.style.width = `${progressPercent()}%`;
+    updatePopup();
+  }
+
+  // ---- fun-fact bubbles (music layout, Pop-Up Video style) ----
+  // data.facts (short strings; none means no bubbles) pop up over a corner of the art: the
+  // first 15 s in, then one per 35 s slot, each held for its reading time. It runs off the
+  // playback position, so a pause holds the bubble and a seek picks the matching slot; nothing
+  // starts in a song's last 15 s or during a song change.
+  const POPUP_END_QUIET_MS = 15000;
+  const POPUP_SETTLE_MS = 1500;  // after a new item: lets a change's last flourishes finish
+  let popupTiming = { first: 15000, every: 35000 };  // ?demo=popup shortens these
+  let popupFacts = [];
+  let popupSlot = -1;          // the slot on screen, or -1
+  let popupShown = new Set();  // slots already shown for this item: each fact shows once
+  let popupShownAt = 0;        // the position (ms) at which the bubble on screen appeared
+  let popupHideAt = 0;         // ... and at which it pops out
+  let popupNotBefore = 0;      // wall-clock ms: no new bubble before this
+
+  function popupReadMs(text) {
+    return 2000 + String(text).length / 15 * 1000;   // ~15 characters a second, plus 2 s
+  }
+
+  function resetPopups(facts) {
+    const el = document.getElementById('nowShowingPopup');
+    if (el) { el.getAnimations().forEach(a => a.cancel()); el.classList.remove('showing'); }
+    popupFacts = Array.isArray(facts) ? facts.filter(f => typeof f === 'string' && f.trim()) : [];
+    popupSlot = -1;
+    popupShown = new Set();
+    // A song change's final animations (the crossfade's art fade-in, the text rise) outlast
+    // trackAnimating, so hold off briefly (Astra pass 1 #3).
+    popupNotBefore = Date.now() + POPUP_SETTLE_MS;
+  }
+
+  function popOutPopup() {
+    const el = document.getElementById('nowShowingPopup');
+    popupSlot = -1;
+    if (!el || !el.classList.contains('showing')) return;
+    el.getAnimations().forEach(a => a.cancel());
+    el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)', offset: 0.3 }, { transform: 'scale(0)' }],
+               { duration: 220, easing: 'ease-in', fill: 'forwards' })
+      .finished.then(() => { if (popupSlot === -1) el.classList.remove('showing'); }).catch(() => {});
+  }
+
+  function popInPopup(slot) {
+    const el = document.getElementById('nowShowingPopup');
+    const poster = document.getElementById('nowShowingPoster');
+    if (!el || !poster) return;
+    const r = poster.getBoundingClientRect();
+    const inset = r.width * 0.05;
+    const topRight = slot % 2 === 0;   // alternate corners
+    el.textContent = popupFacts[slot];
+    el.classList.toggle('corner-tr', topRight);
+    el.classList.toggle('corner-bl', !topRight);
+    Object.assign(el.style, {
+      maxWidth: `${r.width * 0.72}px`,
+      left: topRight ? 'auto' : `${r.left + inset}px`,
+      right: topRight ? `${window.innerWidth - r.right + inset}px` : 'auto',
+      top: topRight ? `${r.top + inset}px` : 'auto',
+      bottom: topRight ? 'auto' : `${window.innerHeight - r.bottom + inset}px`
+    });
+    el.getAnimations().forEach(a => a.cancel());
+    el.classList.add('showing');
+    el.animate([{ transform: 'scale(0)' }, { transform: 'scale(1.08)', offset: 0.65 }, { transform: 'scale(1)' }],
+               { duration: 380, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' });
+    popupSlot = slot;
+    popupShown.add(slot);
+  }
+
+  function updatePopup() {
+    if (!playback || !popupFacts.length) return;
+    const pos = positionMs();
+    if (popupSlot !== -1) {
+      // Done, or a seek back. The start is stored, not recomputed: rounding once made a paused
+      // bubble look like a seek back and vanish on the next tick (Astra pass 1 #2).
+      if (trackAnimating || pos >= popupHideAt || pos < popupShownAt) popOutPopup();
+      return;
+    }
+    if (trackAnimating || Date.now() < popupNotBefore) return;
+    const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);
+    if (slot < 0 || slot >= popupFacts.length || popupShown.has(slot)) return;
+    const read = popupReadMs(popupFacts[slot]);
+    if (pos + read > popupTiming.first + (slot + 1) * popupTiming.every) return;   // joined too late
+    if (playback.duration && pos + read > playback.duration - POPUP_END_QUIET_MS) return;
+    popupShownAt = pos;
+    popupHideAt = pos + read;
+    popInPopup(slot);
   }
 
   // Centre the pause badge on the art, wherever the current layout put it.
@@ -1150,6 +1239,21 @@
           previewItems = [];
         }
         const preview = makePreviewNowPlaying(previewItems, previewMode === 'musicvideo');
+        // &demo=popup: the fun-fact bubbles with hardcoded facts, on a shortened clock
+        if (previewMode === 'musicvideo' && new URLSearchParams(location.search).get('demo') === 'popup') {
+          popupTiming = { first: 3000, every: 12000 };
+          Object.assign(preview, {
+            artist: 'Panic! At The Disco', trackTitle: "Emperor's New Clothes",
+            viewOffset: 0, offsetAt: Date.now(), duration: 180000,
+            // Songfacts and Wikipedia, 2026-09-26
+            facts: [
+              "Brendon Urie stacked his own voice 38 times to get an “operatic evil feel.”",
+              "It riffs on Andersen’s fable, but Urie says he’s in on it: “I just choose to be naked.”",
+              "He calls it autobiographical: Panic! had just become his solo project.",
+              "The video is a sequel to “This Is Gospel”: he dies, drops into Hell and becomes the devil."
+            ]
+          });
+        }
         showNowPlaying(preview, cfg);
         // ?state=loading previews the hold between queue items
         if (new URLSearchParams(location.search).get('state') === 'loading') holdForNextItem(true);

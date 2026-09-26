@@ -603,6 +603,47 @@ def test_a_failed_or_stalled_transition_cleans_up_and_frees_the_poll_loop(source
     assert "await poster.decode()" not in settle
 
 
+def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
+    """Dan approved the Pop-Up Video style bubbles on the TV (2026-09-26): classic pop, first at
+    15 s, one per 30-40 s, each held for its reading time, none in a song's last 15 s or during
+    a song change; a song without facts just has none."""
+    app_js = source(APP_JS)
+    popup = app_js[app_js.index("// ---- fun-fact bubbles"):app_js.index("// Centre the pause badge")]
+    assert "let popupTiming = { first: 15000, every: 35000 };" in popup
+    assert "const POPUP_END_QUIET_MS = 15000;" in popup
+    assert "return 2000 + String(text).length / 15 * 1000;" in popup
+    # Driven by the playback position (a pause holds the bubble; a seek picks the slot).
+    assert "const pos = positionMs();" in popup
+    assert "const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);" in popup
+    assert "playback.duration - POPUP_END_QUIET_MS" in popup
+    # Astra pass 1: every shown slot is remembered (a seek back doesn't repeat a fact); the
+    # start position is stored, not recomputed (a paused bubble must stay); and new bubbles
+    # wait out a change's last animations.
+    assert "popupShown.has(slot)" in popup and "popupShown.add(slot);" in popup
+    assert "popupShownSlot" not in popup
+    assert "popupShownAt = pos;" in popup and "pos < popupShownAt" in popup
+    assert "popupHideAt - popupReadMs" not in popup
+    assert "if (trackAnimating || Date.now() < popupNotBefore) return;" in popup
+    assert "popupNotBefore = Date.now() + POPUP_SETTLE_MS;" in popup
+    # The classic pop, in and out, with transforms only.
+    assert "{ transform: 'scale(1.08)', offset: 0.65 }" in popup
+    assert "{ transform: 'scale(0)' }" in popup
+    # Wired in: ticks with the progress bar; reset per item (music facts only), on rotation;
+    # the old bubble pops out when a song change starts.
+    render = app_js[app_js.index("function renderProgress"):app_js.index("// ---- fun-fact bubbles")]
+    assert "updatePopup();" in render
+    assert "if (newItem) resetPopups(data.mediaType === 'musicvideo' ? data.facts : []);" in app_js
+    rotation = app_js[app_js.index("function showRotation"):app_js.index("// ---- up next and the gap")]
+    assert "resetPopups([]);" in rotation
+    change = app_js[app_js.index("function changeTrack"):app_js.index("async function settleTrack")]
+    assert change.index("popOutPopup();") < change.index("trackAnimating = true;")
+    css = source(STYLES_CSS)
+    for rule in (".now-showing-popup {", ".now-showing-popup.showing {", ".now-showing-popup.corner-tr {",
+                 ".now-showing-popup.corner-bl {", ".now-showing-popup.corner-tr::after {",
+                 ".now-showing-popup.corner-bl::after {"):
+        assert rule in css, rule
+
+
 def test_the_flying_cover_is_not_forced_back_into_the_layout(source):
     """The fly is appended to #nowShowing, whose children get position: relative from a more
     specific rule; unless it's excluded, the fly lands in the flow and shoves the art down."""
@@ -612,6 +653,8 @@ def test_the_flying_cover_is_not_forced_back_into_the_layout(source):
     assert child_rules, "expected the .now-showing > child rule"
     for sel in child_rules:
         assert ":not(.now-showing-fly)" in sel, sel.strip()
+        # The fact bubble is positioned the same way (fixed, from the art's box).
+        assert ":not(.now-showing-popup)" in sel, sel.strip()
 
 
 def test_up_next_titles_are_html_escaped(source):
