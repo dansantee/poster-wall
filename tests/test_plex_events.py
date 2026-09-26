@@ -484,6 +484,141 @@ def test_frames_received_counts_control_frames():
     assert ws.frames_received == 2
 
 
+# --------------------------------------------------------------------------
+# Up next (play queue)
+# --------------------------------------------------------------------------
+XBOX = "vqjl5hn59g1c4sdloc5tetxq"
+PLAYING_XBOX = dict(PLAYING, playerId=XBOX)
+
+
+def note_dict(item_id, rating_key="5", state="playing", session_key="1", queue_id=47799):
+    return {"sessionKey": session_key, "clientIdentifier": XBOX, "ratingKey": rating_key, "state": state,
+            "viewOffset": 0, "playQueueID": queue_id, "playQueueItemID": item_id}
+
+
+def queue_note(item_id, rating_key="5", **kw):
+    return json.dumps({"NotificationContainer": {"type": "playing",
+                                                 "PlaySessionStateNotification": [note_dict(item_id, rating_key, **kw)]}})
+
+
+def with_queue(queue_results):
+    """A queue_fetch that pops results in order and records its calls."""
+    calls = []
+
+    def queue_fetch(base, token, verify, queue_id, item_id):
+        calls.append((queue_id, item_id))
+        result = queue_results.pop(0) if len(queue_results) > 1 else queue_results[0]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    return queue_fetch, calls
+
+
+UP = [{"title": "Fiona Apple - Criminal"}, {"title": "Sublime - Santeria"}]
+
+
+def test_notifications_record_each_players_queue_and_refresh_attaches_up_next():
+    queue_fetch, qcalls = with_queue([UP])
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1963398))
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == UP
+    assert qcalls == [("47799", "1963398")]
+
+
+def test_up_next_is_fetched_once_per_queue_item():
+    queue_fetch, qcalls = with_queue([UP])
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1963398))
+    m.refresh(CFG)
+    m.refresh(CFG)
+    m.wants_refresh(queue_note(1963399))
+    m.refresh(CFG)
+    assert qcalls == [("47799", "1963398"), ("47799", "1963399")]
+
+
+def test_a_lagging_queue_is_not_cached_and_the_row_is_kept_for_the_same_item():
+    queue_fetch, qcalls = with_queue([UP, None, UP[:1]])
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.wants_refresh(queue_note(2))                   # same ratingKey in PLAYING_XBOX
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == UP, "a lookup that can't place the item keeps the old row"
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == UP[:1], "the None was not cached, so it was retried"
+    assert qcalls == [("47799", "1"), ("47799", "2"), ("47799", "2")]
+
+
+def test_a_lagging_queue_for_a_new_item_shows_no_row_rather_than_the_old_one():
+    queue_fetch, _ = with_queue([UP, None])
+    m, clock, calls = make_monitor([PLAYING_XBOX, dict(PLAYING_XBOX, ratingKey="6")], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.wants_refresh(queue_note(2, rating_key="6"))
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == []
+
+
+def test_state_is_published_before_a_slow_queue_lookup():
+    """Astra pass 1 #1: the next item's playing state must not wait on /playQueues."""
+    seen_during_lookup = []
+    m, clock, calls = make_monitor([PLAYING_XBOX])
+
+    def slow_queue_fetch(base, token, verify, queue_id, item_id):
+        seen_during_lookup.append(m.snapshot())
+        return UP
+
+    m._queue_fetch = slow_queue_fetch
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    assert seen_during_lookup[0]["playing"] is True, "already published while the lookup ran"
+    assert seen_during_lookup[0]["upNext"] == []
+    assert m.snapshot()["upNext"] == UP, "then patched in"
+
+
+def test_every_notification_in_a_batch_is_recorded():
+    """Astra pass 1 #2: a batch of A then B leaves the player at B."""
+    queue_fetch, qcalls = with_queue([UP])
+    m, clock, calls = make_monitor([dict(PLAYING_XBOX, ratingKey="B")], queue_fetch=queue_fetch)
+    batch = json.dumps({"NotificationContainer": {"type": "playing", "PlaySessionStateNotification": [
+        note_dict(1, "A"), note_dict(2, "B")]}})
+    assert m.wants_refresh(batch) is True
+    m.refresh(CFG)
+    assert qcalls == [("47799", "2")]
+
+
+def test_a_queue_position_for_a_different_item_is_not_used():
+    """Astra pass 1 #3: after a change seen only by polling, the stored position is stale."""
+    queue_fetch, qcalls = with_queue([UP])
+    m, clock, calls = make_monitor([PLAYING_XBOX, dict(PLAYING_XBOX, ratingKey="6")], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == UP
+    m.refresh(CFG)                                   # sessions moved on to ratingKey 6, no notification yet
+    assert m.snapshot()["upNext"] == [], "no stale list listing the new item as its own next"
+    assert qcalls == [("47799", "1")], "and no lookup with the stale position"
+
+
+def test_no_queue_known_yet_means_no_up_next_and_no_lookup():
+    queue_fetch, qcalls = with_queue([UP])
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == []
+    assert qcalls == []
+
+
+def test_a_failing_queue_lookup_is_recorded_and_does_not_break_the_refresh():
+    queue_fetch, _ = with_queue([RuntimeError("queue 404")])
+    m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    assert m.snapshot()["playing"] is True
+    assert m.snapshot()["upNext"] == []
+    assert "queue 404" in m.last_error
+
+
 def test_nothing_to_watch_means_idle_and_no_cache():
     m, clock, calls = make_monitor([PLAYING], settings=None)
     m._sleep = lambda s: m.stop()

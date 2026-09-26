@@ -70,6 +70,10 @@ init()
                                      polls /api/now-playing every 1s (POLL_MS)
 ```
 
+Any thrown error in `init()` replaces the page body with a full-screen message
+that names the settings URL — see `showError()`. That is the only error UI; there
+is no retry loop, so a proxy that comes up late needs a kiosk restart.
+
 ## How "now playing" stays current
 
 Two jobs are deliberately separate:
@@ -114,9 +118,21 @@ Fallbacks and timing guards:
 reports, so the monitor keeps the time an offset was *first* seen, not the time of
 the latest fetch. The kiosk applies the same rule to its own anchor.
 
-Any thrown error in `init()` replaces the page body with a full-screen message
-that names the settings URL — see `showError()`. That is the only error UI; there
-is no retry loop, so a proxy that comes up late needs a kiosk restart.
+**Up next.** Sessions don't say which play queue they belong to, but the
+notifications do (`playQueueID`, `playQueueItemID`, keyed by the player's
+`clientIdentifier`). The monitor remembers each player's queue. When the playing
+item changes, it fetches `/playQueues/<id>` once (`monitor_queue()` in `app.py`)
+and attaches the next three items as `upNext`. Plex moves a queue's "selected"
+item only once the next video actually starts, so the lookup is made relative to
+the item in the notification, with one item of look-back. A lookup that can't
+find that item yet is not cached, and the 1.5 s follow-up refresh retries it.
+Two more rules:
+- The refreshed playback state is published *before* the queue lookup (3 s
+  timeout), so a slow `/playQueues` can never delay the news that the next item
+  started.
+- A player's recorded queue position is used only while its notification's
+  `ratingKey` matches the playing item. Otherwise, such as after a change seen
+  only by fallback polling, `upNext` is empty until the next notification.
 
 ## Display modes
 
@@ -130,8 +146,8 @@ There are exactly two visual states, tracked by the `currentMode` variable:
         └──────────────────────────────────────────┘
              │                            ▲
    /api/now-playing                       │  /api/now-playing returns
-   returns playing:true                   │  playing:false for 3 s
-   (checked every 1s)                     │  (STOP_GRACE_MS)
+   returns playing:true                   │  playing:false for 3 s, or
+   (checked every 1s)                     │  8 s if more is queued
              ▼                            │
         ┌──────────────────────────────────────────┐
         │             nowplaying                    │
@@ -148,9 +164,18 @@ Two things about `nowplaying` mode are worth knowing:
 - Subsequent polls only update playback (state, position) **unless the playing
   item changed** (a different `ratingKey`, e.g. the next video in a playlist).
   Then the whole screen is re-rendered for the new item.
-- The wall returns to rotation only after 3 s with nothing playing. Plex drops a
-  playlist's old session about 1 s before the next item appears, and without the
-  grace period the posters would flash between songs.
+- When the session disappears, the bar freezes and the wall waits before
+  returning to rotation. Plex drops the old session before the next queued item
+  appears. Usually the gap is 0.1–0.5 s, but a slow-loading next item leaves **no
+  session for up to ~4.2 s**, which is indistinguishable from a real Stop while it
+  is happening (measured 2026-09-26; the queue doesn't move early either). So:
+  - **Nothing more queued** (`upNext` empty): back to rotation after 3 s
+    (`STOP_GRACE_MS`).
+  - **More queued:** wait up to 8 s (`QUEUE_GRACE_MS`), with the "loading" look
+    after 1 s (`LOADING_LOOK_AFTER_MS`, so normal gaps never show it): the art
+    dims and the pause badge becomes a spinner. The cost is that a real Stop
+    mid-queue holds this look for up to 8 s.
+  - `?state=loading` on a preview URL shows the loading look.
 - **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
   `placePauseBadge()` positions it from the art's bounding box, because the art
   sits differently in the movie and music layouts. The wall stays on the
@@ -160,11 +185,19 @@ Two things about `nowplaying` mode are worth knowing:
   `#nowShowing` gets the `music` class, and the layout follows Spotify's
   now-playing screen:
   - The marquee and metadata badges are hidden.
-  - The square art sits on a solid background, the art's average colour
-    darkened to 55% by `computeBackdropColor()` on a 16×16 canvas and painted
-    on `#nowShowingBackdrop`.
+  - The square art sits on a solid background. `computeArtColors()` takes a
+    16×16 sample of the art and paints the average colour, darkened to 55%, on
+    `#nowShowingBackdrop`.
+  - It also picks an **accent**: the average of the most vivid pixels
+    (saturated, neither near-black nor near-white), lifted to 66% lightness
+    and at least 55% saturation so it stands out on the dark background. It's
+    set as `--music-accent` on `#nowShowing`. Near-greyscale art keeps the
+    white default.
   - Below the art, left-aligned: the song (bold), then the artist, then a slim
-    white progress bar.
+    progress bar in the accent colour.
+  - Below that, **"Up next"** (label in the accent colour): up to three
+    upcoming items from `upNext` as square covers with song and artist, drawn
+    by `renderUpNext()`, which HTML-escapes every title.
   - Everything is scoped under `.now-showing.music`, so the movie/TV layout is
     untouched. CSS `order` re-sequences the shared elements rather than the DOM.
 

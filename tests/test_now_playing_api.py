@@ -469,6 +469,61 @@ def test_monitor_settings_need_devices_url_and_token(write_cfg, proxy_app):
     assert proxy_app.monitor_settings()[2] is False
 
 
+def test_player_id_is_returned_so_the_monitor_can_find_its_play_queue(client, monitored):
+    body = playing(client, monitored, session(Player={"address": DEVICE, "title": "X", "machineIdentifier": "vqjl"}))
+    assert body["playerId"] == "vqjl"
+
+
+QUEUES = "/playQueues/"
+
+
+def queue_items(*pairs, section=8):
+    return {"MediaContainer": {"Metadata": [
+        {"playQueueItemID": item_id, "title": title, "thumb": f"/library/metadata/{item_id}/thumb/1",
+         "librarySectionID": section}
+        for item_id, title in pairs]}}
+
+
+def test_up_next_is_the_items_after_the_current_one(write_cfg, plex, proxy_app):
+    write_cfg(musicVideoSectionId=["8"])
+    plex.route(QUEUES, FakeResponse(queue_items(
+        (100, "Savage Garden - Truly Madly Deeply"), (101, "Fiona Apple - Criminal"),
+        (102, "Will Smith - Prince Ali"), (103, "Spice Girls - Say You'll Be There"), (104, "Duran Duran - Come Undone"))))
+    items = proxy_app.monitor_queue(BASE, "tok123", True, "47799", "101")
+    assert [i["trackTitle"] for i in items] == ["Prince Ali", "Say You'll Be There", "Come Undone"]
+    assert items[0]["artist"] == "Will Smith"
+    assert "w=400&h=400" in items[0]["poster"]
+    call = plex.calls_matching(QUEUES)[0]
+    assert call.url == BASE + "/playQueues/47799"
+    assert call.params["includeBefore"] == 1, "the queue can lag one item behind while the next one buffers"
+    assert call.timeout == 3.0, "the monitor thread waits on this lookup"
+
+
+def test_up_next_is_none_while_the_queue_has_not_caught_up(write_cfg, plex, proxy_app):
+    """Plex moves the queue only once the new video starts; the caller retries later."""
+    plex.route(QUEUES, FakeResponse(queue_items((100, "A - a"), (101, "B - b"))))
+    assert proxy_app.monitor_queue(BASE, "tok123", True, "47799", "999") is None
+
+
+def test_up_next_titles_outside_music_libraries_are_not_split(write_cfg, plex, proxy_app):
+    write_cfg(musicVideoSectionId=["8"])
+    plex.route(QUEUES, FakeResponse(queue_items((1, "Severance - S1E1"), (2, "Severance - S1E2"), section=3)))
+    items = proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")
+    assert items == [{"title": "Severance - S1E2", "artist": "", "trackTitle": "Severance - S1E2",
+                      "poster": items[0]["poster"]}]
+
+
+def test_up_next_at_the_end_of_the_queue_is_empty(write_cfg, plex, proxy_app):
+    plex.route(QUEUES, FakeResponse(queue_items((1, "A - a"))))
+    assert proxy_app.monitor_queue(BASE, "tok123", True, "5", "1") == []
+
+
+def test_a_failed_queue_request_raises(plex, proxy_app):
+    plex.route(QUEUES, FakeResponse(status_code=404, ok=False))
+    with pytest.raises(RuntimeError):
+        proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")
+
+
 class _CachedMonitor:
     def __init__(self, body):
         self.body = body

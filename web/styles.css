@@ -6,6 +6,7 @@
   --progress-bar-padding: 1.5vh; /* Default padding value */
   --progress-bar-height: 2.5vh; /* Default height value */
   --poster-dim-brightness: 0.5;
+  --music-accent: #ffffff; /* app.js sets it on #nowShowing from the album art */
 }
 
 *{box-sizing:border-box}
@@ -552,7 +553,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   transition: filter 0.4s ease;
 }
 
-.now-showing.paused .now-showing-poster {
+.now-showing.paused .now-showing-poster,
+.now-showing.loading .now-showing-poster {
   filter: brightness(0.55);
 }
 
@@ -587,8 +589,31 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   right: 32%;
 }
 
-.now-showing.paused .now-showing-pause {
+.now-showing.paused .now-showing-pause,
+.now-showing.loading .now-showing-pause {
   display: block;
+}
+
+/* Waiting for the queue's next item: the badge becomes a spinner ring */
+.now-showing.loading .now-showing-pause::before {
+  top: 22%;
+  left: 22%;
+  width: 56%;
+  height: 56%;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.1vmin solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  background: none;
+  animation: now-showing-spin 1s linear infinite;
+}
+
+.now-showing.loading .now-showing-pause::after {
+  display: none;
+}
+
+@keyframes now-showing-spin {
+  to { transform: rotate(360deg); }
 }
 
 .now-showing-backdrop {
@@ -655,7 +680,67 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   border: none;
   border-radius: 999px;
   box-shadow: none;
-  background-color: #fff;
+  background-color: var(--music-accent);
+}
+
+.now-showing-upnext {
+  display: none;
+}
+
+.now-showing.music .now-showing-upnext {
+  order: 4;
+  display: block;
+  padding: 4vh 5vw 0;
+  font-family: 'Montserrat', system-ui, sans-serif;
+}
+
+.now-showing-upnext-label {
+  margin-bottom: 1.5vh;
+  font-size: clamp(14px, 2.6vw, 44px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--music-accent);
+}
+
+.now-showing-upnext-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3vw;
+}
+
+.now-showing-upnext-item img,
+.now-showing-upnext-blank {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.8vw;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.35);
+}
+
+.now-showing-upnext-song,
+.now-showing-upnext-artist {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.now-showing-upnext-song {
+  margin-top: 1vh;
+  -webkit-line-clamp: 2;
+  font-size: clamp(14px, 2.8vw, 48px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.now-showing-upnext-artist {
+  -webkit-line-clamp: 1;
+  font-size: clamp(12px, 2.4vw, 40px);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .now-showing-artist,

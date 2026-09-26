@@ -5,7 +5,9 @@ Turn your Raspberry Pi into a movie poster kiosk that shows off your Plex librar
 Posters rotate on a portrait display like a cinema one-sheet. When someone starts
 playing something on a device you've nominated, the wall switches to a "Now
 Showing" marquee with a live progress bar and format badges, then goes back to
-rotating when playback stops.
+rotating when playback stops. Music videos get their own Spotify-style screen:
+album art, song and artist, a progress bar in a colour taken from the art, and
+what's up next in the play queue.
 
 ## How it works
 
@@ -13,7 +15,9 @@ Three small pieces run on the Pi as user systemd services:
 
 - **`proxy/app.py`** (port 8811) — a Flask proxy that talks to Plex, holds your
   token, aggregates and shuffles your selected libraries, and stores all settings
-  in `proxy/config.json`
+  in `proxy/config.json`. A background thread (`proxy/plex_events.py`) listens to
+  Plex's notification websocket, so the wall hears about play, pause, seek and
+  stop within about a second without polling Plex.
 - **`web/`** (port 8088) — the kiosk page and the settings page, plain HTML/CSS/JS
   with no build step
 - **Chromium in kiosk mode**, launched by Sway, pointed at the local site
@@ -24,7 +28,7 @@ Full picture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Doc | What's in it |
 | --- | --- |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces fit, boot sequence, display modes, transitions, auto-dimming, known rough edges |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces fit, boot sequence, how "now playing" stays current, display modes, transitions, auto-dimming, known rough edges |
 | [API.md](docs/API.md) | Every proxy endpoint, parameter, response and error, plus environment variables |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting: type, default, valid range, quirks |
 | [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) | What `setup.sh` does, the services, deploy workflows, troubleshooting |
@@ -124,11 +128,26 @@ The settings page lets you customize the setup:
 
 **"Now Playing" mode:**
 - Monitors your Plex clients for active playback
-- Shows live progress bar
-- Automatically switches when someone starts watching something
+- Reacts within about a second to play, pause, seek, stop and the next item,
+  pushed from Plex's notification websocket rather than polled
+- Smooth progress bar that runs between Plex's ~10 s position reports
+- Pause dims the art and shows a pause badge. Between queued items (a
+  playlist, shuffle or next episode) the wall waits for the next one with a
+  spinner instead of flashing back to posters.
 - Displays resolution badges, audio format, ratings
 - Works with the libraries selected
-- Includes preview buttons on the settings page for idle mode and now-playing mode
+- Includes preview buttons on the settings page for idle mode, now-playing mode
+  and music-video mode
+
+**Music videos:**
+- Point `musicVideoSectionId` at a Plex "Other Videos" library of
+  `Artist - Title` files
+- Shows square album art on a background coloured from the art, the song and
+  artist, and a progress bar in an accent colour picked from the art
+- "Up next" row with the next three items in the play queue, shuffle included
+- Plex shows a video frame for "Other Videos" by default. For real album art,
+  put an `Artist - Title.jpg` next to each video: Plex uses it as the poster,
+  and the wall shows that poster.
 
 **Other features:**
 - Auto-dims overly bright posters, white backgrounds, etc.
@@ -161,8 +180,9 @@ cd web
 python -m http.server 8088
 ```
 
-More detail, including the preview modes for iterating on the marquee without
-starting playback, in [DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Run this way, `app.py` also starts the Plex websocket monitor. More detail,
+including the preview modes for iterating on the marquee without starting
+playback, in [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Tests
 
@@ -172,7 +192,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-225 tests, under a second, no Plex server or network needed. They cover the proxy
+306 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
 API's behaviour end to end, and — since the frontend has no build step or test
 runner — they also assert the string-level contracts that hold the project
 together: element ids matching the HTML, transition names matching the CSS,

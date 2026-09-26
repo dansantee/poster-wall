@@ -273,7 +273,12 @@ contacts Plex at all.
   "mediaType": "episode",
   "ratingKey": "202",
   "artist": "",
-  "trackTitle": ""
+  "trackTitle": "",
+  "playerId": "vqjl5hn59g1c4sdloc5tetxq",
+  "upNext": [
+    { "title": "Severance - S1E3 - In Perpetuity", "artist": "", "trackTitle": "Severance - S1E3 - In Perpetuity",
+      "poster": "/api/poster?…&w=400&h=400&…" }
+  ]
 }
 ```
 
@@ -290,6 +295,8 @@ contacts Plex at all.
 | `mediaType` | `movie`, `episode`, or `musicvideo` for a session from a `musicVideoSectionId` library |
 | `ratingKey` | Plex's id for the playing item. The kiosk compares it between polls to notice a playlist moving to the next item without a stop |
 | `artist`, `trackTitle` | Music videos only (empty otherwise): the title split on its first `" - "`. A title with no separator is all `trackTitle` |
+| `playerId` | The player's `machineIdentifier`. Plex's notifications identify players by it (as `clientIdentifier`), which is how the monitor finds the session's play queue |
+| `upNext` | Only from the monitor's cache (absent on the direct path). Up to 3 items after the current one in the player's Plex play queue, in queue order (so shuffle is respected). Each item has `title`, `artist`/`trackTitle` (split as above for music-video libraries; otherwise `artist` is empty and `trackTitle` is the whole title) and a 400×400 `poster`. `[]` when nothing more is queued or the queue isn't known yet. The kiosk also uses a non-empty list as its sign that another item is coming: when the session disappears it waits up to 8 s instead of 3 s (see ARCHITECTURE.md) |
 
 **Filtering order** — a session must pass all of these:
 

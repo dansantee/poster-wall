@@ -209,11 +209,14 @@ class NowPlayingMonitor:
     it is on a monitored device. It raises on failure, and the previous state is then kept.
     """
 
-    def __init__(self, fetch, settings, connect=None, safety_poll=30.0, fallback_poll=2.0,
-                 reconnect_after=10.0, max_age=45.0, followup_delay=1.5, pong_timeout=10.0,
-                 connect_timeout=3.0, clock=time.time, sleep=time.sleep):
+    def __init__(self, fetch, settings, connect=None, queue_fetch=None, safety_poll=30.0,
+                 fallback_poll=2.0, reconnect_after=10.0, max_age=45.0, followup_delay=1.5,
+                 pong_timeout=10.0, connect_timeout=3.0, clock=time.time, sleep=time.sleep):
         self._fetch = fetch
         self._settings = settings
+        # queue_fetch(base, token, verify, queue_id, item_id) -> upcoming items, or None if
+        # the queue has not caught up with item_id yet. Optional: without it, no "upNext".
+        self._queue_fetch = queue_fetch
         # A short connect timeout bounds how long a hanging upgrade can hold up fallback polling.
         self._connect = connect or (lambda url, verify: MiniWebSocket.connect(
             url, timeout=connect_timeout, verify=verify))
@@ -234,6 +237,8 @@ class NowPlayingMonitor:
         self._updated = 0.0
         self._attempted = 0.0
         self._sessions = {}
+        self._queues = {}        # player clientIdentifier -> (playQueueID, playQueueItemID, ratingKey)
+        self._up_next = {}       # (playQueueID, playQueueItemID) -> upcoming items
         self.mode = "starting"   # starting | idle | push | poll
         self.last_error = None
 
@@ -248,6 +253,20 @@ class NowPlayingMonitor:
     def refresh(self, cfg):
         body, sessions = self._fetch(*cfg)
         body = dict(body)
+        lookup = None
+        if body.get("playing"):
+            body["upNext"], lookup = self._known_upcoming(body)
+        self._publish(body, sessions)
+        # The playback state is published first: a slow queue lookup must never hold back the
+        # news that the next item started (Astra pass 1 #1). The lookup then patches upNext in.
+        if lookup is not None:
+            items = self._lookup_upcoming(cfg, lookup)
+            if items is not None:
+                with self._lock:
+                    if self._body and self._body.get("ratingKey") == body.get("ratingKey"):
+                        self._body = dict(self._body, upNext=items)
+
+    def _publish(self, body, sessions):
         now_ms = int(self._clock() * 1000)
         with self._lock:
             prev = self._body
@@ -264,6 +283,42 @@ class NowPlayingMonitor:
             self._updated = self._clock()
             self._sessions = dict(sessions)
 
+    def _known_upcoming(self, body):
+        """(upNext to publish now, (queueID, itemID) still to look up or None).
+
+        Sessions don't say which play queue they belong to; notifications do, keyed by the
+        player's clientIdentifier (= the body's playerId). The queue position is used only if
+        the notification was about the item that is playing now (Astra pass 1 #3): after a
+        change seen only by polling, a stale position would list the new item as its own
+        "up next".
+        """
+        with self._lock:
+            entry = self._queues.get(body.get("playerId"))
+            prev = self._body
+            if (not entry or self._queue_fetch is None
+                    or entry[2] != str(body.get("ratingKey", ""))):
+                return [], None
+            key = entry[:2]
+            cached = self._up_next.get(key)
+        if cached is not None:
+            return cached, None
+        # Not looked up yet: keep what we had for this same item rather than blanking the row.
+        same_item = prev and prev.get("ratingKey") == body.get("ratingKey")
+        return (list(prev.get("upNext") or []) if same_item else []), key
+
+    def _lookup_upcoming(self, cfg, key):
+        """Fetch one queue item's up-next list. None (queue not caught up, or an error) is not
+        cached, so the next refresh tries again."""
+        try:
+            items = self._queue_fetch(*cfg, key[0], key[1])
+        except Exception as e:
+            self.last_error = f"queue: {e}"
+            return None
+        if items is not None:
+            with self._lock:
+                self._up_next = {key: items}  # only the current item's list is ever needed
+        return items
+
     def _safe_refresh(self, cfg):
         self._attempted = self._clock()  # deadlines key off attempts, so a failing Plex is not hammered
         try:
@@ -279,14 +334,21 @@ class NowPlayingMonitor:
             return False
         if container.get("type") != "playing":
             return False
+        wanted = False
+        # Every notification in a batch is recorded, even after one has already decided the
+        # answer (Astra pass 1 #2): the last one is the player's current queue position.
         for note in container.get("PlaySessionStateNotification") or []:
             key = str(note.get("sessionKey", ""))
             with self._lock:
+                if note.get("clientIdentifier") and note.get("playQueueID"):
+                    self._queues[note["clientIdentifier"]] = (
+                        str(note["playQueueID"]), str(note.get("playQueueItemID", "")),
+                        str(note.get("ratingKey", "")))
                 known = key in self._sessions
                 monitored = self._sessions.get(key, False)
             if not known or monitored:
-                return True
-        return False
+                wanted = True
+        return wanted
 
     # -- loop ------------------------------------------------------------------------------
     def stop(self):

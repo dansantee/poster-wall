@@ -37,6 +37,7 @@ REQUIRED_INDEX_IDS = {
     "nowShowingArtist",
     "nowShowingSong",
     "nowShowingPauseBadge",
+    "nowShowingUpNext",
 }
 
 # The settings page cannot save without these.
@@ -438,9 +439,43 @@ def test_the_kiosk_rerenders_when_the_playing_item_changes(source):
 def test_music_video_background_is_a_solid_colour_from_the_art(source):
     """Spotify-style: one averaged colour, not a blurred copy of the image."""
     app_js = source(APP_JS)
-    assert "computeBackdropColor(prox(data.poster))" in app_js
-    assert "backdrop.style.backgroundColor" in app_js
+    assert "computeArtColors(prox(data.poster))" in app_js
+    assert "backdrop.style.backgroundColor = colors.backdrop" in app_js
     assert "backgroundImage" not in app_js
+
+
+def test_music_video_accent_colour_comes_from_the_art_with_a_white_fallback(source):
+    app_js = source(APP_JS)
+    assert "nowShowing.style.setProperty('--music-accent', colors.accent)" in app_js
+    assert "nowShowing.style.removeProperty('--music-accent')" in app_js
+    # Astra pass 1 #4: a late result for an earlier item must not recolour the current one
+    assert "if (!colors || currentItemKey !== colorsFor) return;" in app_js
+    css = source(STYLES_CSS)
+    assert "--music-accent: #ffffff;" in css
+    assert "background-color: var(--music-accent);" in css
+
+
+def test_a_session_gap_holds_longer_when_more_is_queued(source):
+    """Measured 2026-09-26: a slow-loading next item leaves no session for 3.9-4.2 s, which
+    looks exactly like a Stop; only the queue says more is coming."""
+    app_js = source(APP_JS)
+    assert "const STOP_GRACE_MS = 3000;" in app_js
+    assert "const QUEUE_GRACE_MS = 8000;" in app_js
+    assert "const LOADING_LOOK_AFTER_MS = 1000;" in app_js
+    assert "gone >= (queueHasMore ? QUEUE_GRACE_MS : STOP_GRACE_MS)" in app_js
+    assert "queueHasMore = Array.isArray(data.upNext) && data.upNext.length > 0;" in app_js
+    css = source(STYLES_CSS)
+    assert ".now-showing.loading .now-showing-pause::before" in css
+    assert "@keyframes now-showing-spin" in css
+
+
+def test_up_next_titles_are_html_escaped(source):
+    """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
+    app_js = source(APP_JS)
+    body = app_js[app_js.index("function renderUpNext"):app_js.index("function holdForNextItem")]
+    assert "escapeHtml(item.trackTitle || item.title)" in body
+    assert "escapeHtml(item.artist)" in body
+    assert "escapeHtml(prox(item.poster))" in body
 
 
 def test_music_video_mode_hides_the_marquee(source):

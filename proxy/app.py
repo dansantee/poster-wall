@@ -10,6 +10,7 @@ app = Flask(__name__)
 # ---- Config / constants ----
 DEFAULT_SECTION = os.environ.get('SECTION_ID', '1')
 TIMEOUT = float(os.environ.get('TIMEOUT', '10'))
+QUEUE_TIMEOUT = 3.0  # play-queue lookups for "up next" run on the monitor thread
 ALLOW_INSECURE_DEFAULT = os.environ.get('ALLOW_INSECURE','').strip().lower() in ('1','true','yes','on')
 
 # Optional server-wide token (client may also send a token)
@@ -380,6 +381,51 @@ def monitor_settings():
     return (base, token, verify_tls)
 
 
+def poster_url(base, token, thumb, verify_tls, w=1200, h=1800):
+    """Relative /api/poster URL for a Plex thumb, as the kiosk expects it."""
+    insecure_q = '1' if not verify_tls else '0'
+    return (
+        f"/api/poster?base={quote_plus(base)}&thumb={quote_plus(thumb)}"
+        f"&token={quote_plus(token)}&w={w}&h={h}&insecure={insecure_q}"
+    )
+
+
+def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
+    """The ``count`` items after ``current_item_id`` in Plex play queue ``queue_id`` ("up next").
+
+    Returns None when the current item is not in the fetched window: Plex moves the queue's
+    selected item only once the new video actually starts (measured 2026-09-26), so a
+    lookup made while it buffers can lag, and the caller should try again on its next refresh.
+    Raises on an HTTP failure.
+    """
+    # Short timeout: the monitor thread waits on this lookup (Astra pass 1 #1).
+    r = requests.get(f"{base}/playQueues/{queue_id}",
+                     params={'X-Plex-Token': token, 'window': count + 3, 'includeBefore': 1},
+                     headers=PLEX_HEADERS, timeout=min(TIMEOUT, QUEUE_TIMEOUT), verify=verify_tls)
+    if not r.ok:
+        raise RuntimeError(f"Play queue request failed: {r.status_code}")
+    items = r.json().get('MediaContainer', {}).get('Metadata', []) or []
+    ids = [str(i.get('playQueueItemID')) for i in items]
+    if str(current_item_id) not in ids:
+        return None
+    srv = load_cfg()
+    music = srv.get('musicVideoSectionId', [])
+    music = [str(s).strip() for s in (music if isinstance(music, list) else [music])]
+    upcoming = []
+    for item in items[ids.index(str(current_item_id)) + 1:][:count]:
+        title = item.get('title', '')
+        artist, sep, track = title.partition(' - ')
+        is_music = str(item.get('librarySectionID', '')) in music and sep
+        thumb = item.get('thumb')
+        upcoming.append({
+            "title": title,
+            "artist": artist if is_music else '',
+            "trackTitle": track if is_music else title,
+            "poster": poster_url(base, token, thumb, verify_tls, 400, 400) if thumb else None,
+        })
+    return upcoming
+
+
 def monitor_fetch(base, token, verify_tls):
     """One refresh for the monitor. Raises on failure so the monitor keeps its last good state."""
     if not verify_tls:
@@ -545,6 +591,9 @@ def now_playing_body(srv, base, token, verify_tls):
                 "audioCodec": audio_codec,
                 "audioChannels": audio_channels,
                 "playerTitle": player.get('title', ''),
+                # Matches the clientIdentifier on Plex's notifications, which is where the
+                # monitor learns this player's play queue (sessions don't carry it).
+                "playerId": player.get('machineIdentifier', ''),
                 "mediaType": media_type,
                 "ratingKey": rating_key,
                 "artist": artist,
@@ -588,6 +637,7 @@ def debug_routes():
 if __name__ == '__main__':
     # pip install flask requests
     print("Starting Poster Wall Proxy from:", __file__)
-    MONITOR = plex_events.NowPlayingMonitor(fetch=monitor_fetch, settings=monitor_settings)
+    MONITOR = plex_events.NowPlayingMonitor(fetch=monitor_fetch, settings=monitor_settings,
+                                            queue_fetch=monitor_queue)
     MONITOR.start()
     app.run(host='0.0.0.0', port=8811, threaded=True)

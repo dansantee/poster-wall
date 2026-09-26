@@ -330,8 +330,22 @@
   }
   function shouldDim(avgLuma){ return avgLuma >= 200; } // tweak if desired
 
-  // Music-video background: the art's average colour, darkened so white text stays readable.
-  function computeBackdropColor(src) {
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+    if (max === min) return { h: 0, s: 0, l };
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: h * 60, s, l };
+  }
+
+  // Music-video colours from the art, on a 16x16 sample:
+  // - backdrop: the average colour, darkened so white text stays readable
+  // - accent: the most vivid pixels' colour, lifted to a bright, saturated tone that stands out
+  //   on the dark backdrop (progress bar, "Up next" label); null for near-greyscale art,
+  //   which keeps the white default
+  function computeArtColors(src) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -342,9 +356,25 @@
         ctx.drawImage(img, 0, 0, 16, 16);
         const { data } = ctx.getImageData(0, 0, 16, 16);
         let r = 0, g = 0, b = 0;
-        for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; }
+        const pixels = [];
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i+1]; b += data[i+2];
+          const hsl = rgbToHsl(data[i], data[i+1], data[i+2]);
+          // Vivid = saturated and neither near-black nor near-white
+          pixels.push({ rgb: [data[i], data[i+1], data[i+2]], score: hsl.s * (1 - Math.abs(hsl.l - 0.5) * 2) });
+        }
         const n = data.length / 4, darken = 0.55;
-        resolve(`rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`);
+        const backdrop = `rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`;
+
+        const top = Math.max(...pixels.map(p => p.score));
+        let accent = null;
+        if (top >= 0.15) {
+          const vivid = pixels.filter(p => p.score >= top * 0.6);
+          const avg = [0, 1, 2].map(k => vivid.reduce((sum, p) => sum + p.rgb[k], 0) / vivid.length);
+          const hsl = rgbToHsl(avg[0], avg[1], avg[2]);
+          accent = `hsl(${Math.round(hsl.h)}, ${Math.round(Math.max(hsl.s, 0.55) * 100)}%, 66%)`;
+        }
+        resolve({ backdrop, accent });
       };
       img.onerror = () => resolve(null);
       img.src = src;
@@ -391,6 +421,9 @@
       preview.mediaType = 'musicvideo';
       preview.artist = 'Weezer';
       preview.trackTitle = 'Buddy Holly';
+      preview.upNext = (items || []).slice(1, 4).map((it, i) => ({
+        title: it.title, artist: ['Fiona Apple', 'Duran Duran', 'Sublime'][i], trackTitle: it.title, poster: it.poster
+      }));
     }
     return preview;
   }
@@ -538,9 +571,12 @@
   // The proxy answers /api/now-playing from a cache that Plex's websocket keeps fresh, so a
   // 1 s poll costs nothing upstream and stops/changes reach the wall within about a second.
   const POLL_MS = 1000;
-  // Plex drops the old session ~1 s before a playlist's next item appears; don't flash the
-  // poster rotation in between.
+  // Plex drops the old session before a playlist's next item appears; don't flash the poster
+  // rotation in between. Nothing queued: 3 s. More queued: up to 8 s (slow loads measured at
+  // 3.9-4.2 s), showing the loading look once it has been more than a normal 0.1-0.5 s gap.
   const STOP_GRACE_MS = 3000;
+  const QUEUE_GRACE_MS = 8000;
+  const LOADING_LOOK_AFTER_MS = 1000;
   const PROGRESS_TICK_MS = 250;
   let currentMode = 'rotation'; // 'rotation' or 'nowplaying'
   let currentItemKey = null;    // what is on screen in nowplaying mode, to spot a track change
@@ -604,10 +640,16 @@
     if (artistEl) artistEl.textContent = isMusicVideo ? (data.artist || '') : '';
     if (songEl) songEl.textContent = isMusicVideo ? (data.trackTitle || data.title || '') : '';
     if (backdrop && isMusicVideo && data.poster) {
-      computeBackdropColor(prox(data.poster)).then(color => {
-        if (color) backdrop.style.backgroundColor = color;
+      const colorsFor = nowPlayingKey(data);
+      computeArtColors(prox(data.poster)).then(colors => {
+        // A slow result for an earlier item must not recolour the current one (Astra pass 1 #4)
+        if (!colors || currentItemKey !== colorsFor) return;
+        backdrop.style.backgroundColor = colors.backdrop;
+        if (colors.accent) nowShowing.style.setProperty('--music-accent', colors.accent);
+        else nowShowing.style.removeProperty('--music-accent');
       });
     }
+    upNextShown = null; // force the up-next row to redraw for the new item
     currentItemKey = nowPlayingKey(data);
 
     // Clear existing icons (music videos show artist and song instead)
@@ -651,12 +693,58 @@
     const stage = document.getElementById('stage');
     const nowShowing = document.getElementById('nowShowing');
 
-    if (nowShowing) nowShowing.classList.remove('visible', 'music', 'paused');
+    if (nowShowing) nowShowing.classList.remove('visible', 'music', 'paused', 'loading');
     if (stage) stage.style.display = 'block';
     currentMode = 'rotation';
     currentItemKey = null;
     playback = null;
+    queueHasMore = false;
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+  }
+
+  // ---- up next and the gap between queue items ----
+  // Plex play queues say what's coming (the proxy's upNext). They also answer the one question
+  // the session data can't: when a session vanishes, is another item coming? A slow-loading
+  // next item leaves no session for up to ~4.2 s, exactly like a real Stop (measured
+  // 2026-09-26), so with more queued the screen is held longer, in a "loading" look.
+  let queueHasMore = false;
+  let upNextShown = null;    // JSON of the items currently drawn, to redraw only on change
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderUpNext(items) {
+    const el = document.getElementById('nowShowingUpNext');
+    const list = (items || []).slice(0, 3);
+    const json = JSON.stringify(list);
+    if (!el || json === upNextShown) return;
+    upNextShown = json;
+    el.innerHTML = !list.length ? '' :
+      `<div class="now-showing-upnext-label">Up next</div><div class="now-showing-upnext-row">` +
+      list.map(item =>
+        `<div class="now-showing-upnext-item">` +
+          (item.poster ? `<img src="${escapeHtml(prox(item.poster))}" alt="" />` : '<div class="now-showing-upnext-blank"></div>') +
+          `<div class="now-showing-upnext-song">${escapeHtml(item.trackTitle || item.title)}</div>` +
+          `<div class="now-showing-upnext-artist">${escapeHtml(item.artist)}</div>` +
+        `</div>`).join('') +
+      `</div>`;
+  }
+
+  // The session vanished: stop the bar where it is and, if more is queued, show that the next
+  // item is on its way.
+  function holdForNextItem(showLoading) {
+    if (playback && playback.state !== 'stopped') {
+      playback.offset = positionMs();
+      playback.at = Date.now();
+      playback.state = 'stopped';
+      renderProgress();
+    }
+    const nowShowing = document.getElementById('nowShowing');
+    if (nowShowing && showLoading && !nowShowing.classList.contains('loading')) {
+      nowShowing.classList.add('loading');
+      placePauseBadge();
+    }
   }
 
   // ---- progress bar and pause state ----
@@ -694,8 +782,11 @@
       duration: Number(data.duration) || 0,
       progress: Number(data.progress) || 0
     };
+    queueHasMore = Array.isArray(data.upNext) && data.upNext.length > 0;
+    renderUpNext(data.upNext);
     const nowShowing = document.getElementById('nowShowing');
     if (nowShowing) {
+      nowShowing.classList.remove('loading');
       nowShowing.classList.toggle('paused', state === 'paused');
       if (state === 'paused') placePauseBadge();
     }
@@ -782,10 +873,12 @@
           applyPlayback(nowPlayingData); // same item: pause/resume, seek, fresh position
         }
       } else if (currentMode === 'nowplaying') {
-        // A stop, or the ~1 s gap between two playlist items. Only give up the screen once
-        // nothing has been playing for STOP_GRACE_MS.
+        // A stop, or the gap before the queue's next item. Only give up the screen once nothing
+        // has been playing for the grace period.
         if (missingSince === null) missingSince = Date.now();
-        if (Date.now() - missingSince >= STOP_GRACE_MS) {
+        const gone = Date.now() - missingSince;
+        holdForNextItem(queueHasMore && gone >= LOADING_LOOK_AFTER_MS);
+        if (gone >= (queueHasMore ? QUEUE_GRACE_MS : STOP_GRACE_MS)) {
           missingSince = null;
           showRotation();
         }
@@ -810,6 +903,8 @@
           previewItems = [];
         }
         showNowPlaying(makePreviewNowPlaying(previewItems, previewMode === 'musicvideo'), cfg);
+        // ?state=loading previews the hold between queue items
+        if (new URLSearchParams(location.search).get('state') === 'loading') holdForNextItem(true);
         return;
       }
 
