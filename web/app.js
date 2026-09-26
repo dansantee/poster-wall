@@ -373,8 +373,14 @@
 
   function makePreviewNowPlaying(items, musicVideo) {
     const item = (items && items.length > 0) ? items[0] : null;
+    // ?state=paused previews the pause treatment
+    const state = new URLSearchParams(location.search).get('state') || 'playing';
     const preview = {
       playing: true,
+      state,
+      duration: 240000,
+      viewOffset: 100800,
+      offsetAt: Date.now(),
       progress: 42,
       poster: item ? item.poster : '',
       rating: item ? item.rating : 'PG-13',
@@ -528,7 +534,14 @@
 
   // ---- now playing functionality ----
   let rotationInterval = null;
-  let nowPlayingInterval = null;
+  let nowPlayingTimer = null;
+  // The proxy answers /api/now-playing from a cache that Plex's websocket keeps fresh, so a
+  // 1 s poll costs nothing upstream and stops/changes reach the wall within about a second.
+  const POLL_MS = 1000;
+  // Plex drops the old session ~1 s before a playlist's next item appears; don't flash the
+  // poster rotation in between.
+  const STOP_GRACE_MS = 3000;
+  const PROGRESS_TICK_MS = 250;
   let currentMode = 'rotation'; // 'rotation' or 'nowplaying'
   let currentItemKey = null;    // what is on screen in nowplaying mode, to spot a track change
 
@@ -584,10 +597,10 @@
       titleEl.textContent = cfg.nowShowingText; // hidden by CSS in music-video mode
       applyFontSettings(cfg);
     }
-    if (progressBar) {
-      progressBar.style.width = `${data.progress || 0}%`;
+    if (poster && data.poster) {
+      poster.onload = placePauseBadge;
+      poster.src = prox(data.poster);
     }
-    if (poster && data.poster) poster.src = prox(data.poster);
     if (artistEl) artistEl.textContent = isMusicVideo ? (data.artist || '') : '';
     if (songEl) songEl.textContent = isMusicVideo ? (data.trackTitle || data.title || '') : '';
     if (backdrop && isMusicVideo && data.poster) {
@@ -631,16 +644,94 @@
     // Show now playing screen
     nowShowing.classList.add('visible');
     currentMode = 'nowplaying';
+    applyPlayback(data, true);
   }
 
   function showRotation() {
     const stage = document.getElementById('stage');
     const nowShowing = document.getElementById('nowShowing');
-    
-    if (nowShowing) nowShowing.classList.remove('visible', 'music');
+
+    if (nowShowing) nowShowing.classList.remove('visible', 'music', 'paused');
     if (stage) stage.style.display = 'block';
     currentMode = 'rotation';
     currentItemKey = null;
+    playback = null;
+    if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+  }
+
+  // ---- progress bar and pause state ----
+  // Plex only learns the position from the player's ~10 s reports, while play/pause/seek/stop
+  // arrive within ~1 s (measured 2026-09-26). So the bar runs locally from the last report
+  // (viewOffset observed at offsetAt) and only moves while the state is "playing".
+  let playback = null;       // { key, offset, at, duration, state, progress }
+  let progressTimer = null;
+
+  function applyPlayback(data, newItem) {
+    const offset = Number(data.viewOffset) || 0;
+    const state = data.state || 'playing';
+    const key = nowPlayingKey(data);
+    // Compare with the last offset Plex *reported*, not the anchor: after a freeze the anchor is
+    // the on-screen position, and a repeat of the same report must not look like a new one.
+    const sameOffset = !newItem && playback && playback.key === key && playback.reported === offset;
+    let anchorOffset = offset;
+    let anchorAt = Number(data.offsetAt) || Date.now();
+    if (sameOffset && playback.state === state) {
+      // A repeated report keeps the existing anchor so the bar never snaps back to a stale
+      // value (the proxy's monitor already does this; this covers its direct, uncached path).
+      anchorOffset = playback.offset;
+      anchorAt = playback.at;
+    } else if (sameOffset) {
+      // The state changed (pause, buffering, resume) but Plex has not sent a new position:
+      // continue from what is on screen rather than jumping back to the stale offset.
+      anchorOffset = positionMs();
+      anchorAt = Date.now();
+    }
+    playback = {
+      key, state,
+      offset: anchorOffset,
+      reported: offset,
+      at: anchorAt,
+      duration: Number(data.duration) || 0,
+      progress: Number(data.progress) || 0
+    };
+    const nowShowing = document.getElementById('nowShowing');
+    if (nowShowing) {
+      nowShowing.classList.toggle('paused', state === 'paused');
+      if (state === 'paused') placePauseBadge();
+    }
+    renderProgress();
+    if (!progressTimer) progressTimer = setInterval(renderProgress, PROGRESS_TICK_MS);
+  }
+
+  // Where playback is now, in ms: the anchor, advanced by wall time only while playing.
+  function positionMs() {
+    if (!playback) return 0;
+    let position = playback.offset;
+    if (playback.state === 'playing') position += Date.now() - playback.at;
+    return playback.duration ? Math.min(playback.duration, position) : position;
+  }
+
+  function progressPercent() {
+    if (!playback) return 0;
+    if (!playback.duration) return playback.progress;
+    return Math.min(100, Math.max(0, positionMs() / playback.duration * 100));
+  }
+
+  function renderProgress() {
+    const bar = document.getElementById('nowShowingProgressBar');
+    if (bar && playback) bar.style.width = `${progressPercent()}%`;
+  }
+
+  // Centre the pause badge on the art, wherever the current layout put it.
+  function placePauseBadge() {
+    const badge = document.getElementById('nowShowingPauseBadge');
+    const poster = document.getElementById('nowShowingPoster');
+    if (!badge || !poster) return;
+    requestAnimationFrame(() => {
+      const r = poster.getBoundingClientRect();
+      badge.style.left = `${r.left + r.width / 2}px`;
+      badge.style.top = `${r.top + r.height / 2}px`;
+    });
   }
 
   function startRotation(cfg, list){
@@ -671,40 +762,38 @@
   }
 
   function startNowPlayingMonitor(cfg) {
-    // Clear any existing monitor
-    if (nowPlayingInterval) {
-      clearInterval(nowPlayingInterval);
-      nowPlayingInterval = null;
+    if (nowPlayingTimer) {
+      clearTimeout(nowPlayingTimer);
+      nowPlayingTimer = null;
     }
+    let missingSince = null;
 
-    // Check every 5 seconds for now playing status
-    nowPlayingInterval = setInterval(async () => {
+    // One poll at a time: the next is scheduled only after this one finishes.
+    async function tick() {
       const nowPlayingData = await checkNowPlaying(cfg);
-      
-      if (nowPlayingData.playing && currentMode === 'rotation') {
-        showNowPlaying(nowPlayingData, cfg);
-      } else if (!nowPlayingData.playing && currentMode === 'nowplaying') {
-        showRotation();
-      } else if (nowPlayingData.playing && currentMode === 'nowplaying' &&
-                 nowPlayingKey(nowPlayingData) !== currentItemKey) {
-        // Something else started without a stop in between (next track in a playlist)
-        showNowPlaying(nowPlayingData, cfg);
-      } else if (nowPlayingData.playing && currentMode === 'nowplaying') {
-        // Update progress bar if still playing
-        const progressBar = document.getElementById('nowShowingProgressBar');
-        if (progressBar) {
-          progressBar.style.width = `${nowPlayingData.progress || 0}%`;
+
+      if (nowPlayingData.playing) {
+        missingSince = null;
+        if (currentMode !== 'nowplaying' || nowPlayingKey(nowPlayingData) !== currentItemKey) {
+          // Playback started, or something else started without a stop in between
+          // (the next track in a playlist)
+          showNowPlaying(nowPlayingData, cfg);
+        } else {
+          applyPlayback(nowPlayingData); // same item: pause/resume, seek, fresh position
+        }
+      } else if (currentMode === 'nowplaying') {
+        // A stop, or the ~1 s gap between two playlist items. Only give up the screen once
+        // nothing has been playing for STOP_GRACE_MS.
+        if (missingSince === null) missingSince = Date.now();
+        if (Date.now() - missingSince >= STOP_GRACE_MS) {
+          missingSince = null;
+          showRotation();
         }
       }
-    }, 5000);
+      nowPlayingTimer = setTimeout(tick, POLL_MS);
+    }
 
-    // Initial check
-    setTimeout(async () => {
-      const nowPlayingData = await checkNowPlaying(cfg);
-      if (nowPlayingData.playing) {
-        showNowPlaying(nowPlayingData, cfg);
-      }
-    }, 1000);
+    nowPlayingTimer = setTimeout(tick, POLL_MS);
   }
 
   // ---- boot ----

@@ -77,7 +77,6 @@ What code the Pi is actually running. Shells out to `git` in the repo root.
 | `dirty` | `true` when `git status --short` is non-empty; `null` on failure |
 | `status` | `git status --short` split into lines; `[]` when clean |
 | `hostname` | `socket.gethostname()`, always present |
-
 If git is missing or fails, the response is still `200` but carries
 `{"error": "<message>", "dirty": null, "status": []}`. The settings page renders
 `error` verbatim.
@@ -231,8 +230,14 @@ Reports playback, but **only** from the device addresses listed in
 `musicVideoSectionId`. Both filters are whitelists; anything unlisted is
 invisible to the wall.
 
-The kiosk polls this every 5 seconds, so it always answers `200` — upstream
+The kiosk polls this every second, so it always answers `200` — upstream
 problems are reported in the body, not as an HTTP error.
+
+When the proxy runs as the service, it answers from a cache that its background
+monitor keeps fresh from Plex's websocket (see ARCHITECTURE.md, "How now
+playing stays current"), so these polls do not reach Plex. With no monitor, or a
+cache older than 45 s, it asks Plex directly on every call. The device switch
+below is checked first either way.
 
 **Not playing**
 
@@ -251,6 +256,8 @@ contacts Plex at all.
 ```json
 {
   "playing": true,
+  "state": "playing",
+  "offsetAt": 1790411725120,
   "title": "Severance - S1E2 - Good News About Hell",
   "year": 2022,
   "rating": "TV-MA",
@@ -278,6 +285,8 @@ contacts Plex at all.
 | `videoCodec`, `audioCodec` | Uppercased |
 | `audioChannels` | `"<n>.0"` for mono/stereo, `"<n>.1"` above that, `""` when unknown. Plex counts LFE, so a 5.1 track arrives as 6 channels and is reported as `6.1`; `app.js` maps that back to the 5.1 icon |
 | `poster` | Relative proxy URL, or `null` if no artwork could be found |
+| `state` | Plex's `Player.state`: `playing`, `paused` or `buffering` (`playing` if absent). The kiosk advances the bar only while `playing` and shows the pause treatment for `paused` |
+| `offsetAt` | When `viewOffset` was observed, in ms since the epoch (proxy clock, which is the kiosk's clock on the Pi). The monitor keeps the *first* time an unchanged offset was seen, because Plex repeats a stale offset between the player's ~10 s reports |
 | `mediaType` | `movie`, `episode`, or `musicvideo` for a session from a `musicVideoSectionId` library |
 | `ratingKey` | Plex's id for the playing item. The kiosk compares it between polls to notice a playlist moving to the next item without a stop |
 | `artist`, `trackTitle` | Music videos only (empty otherwise): the title split on its first `" - "`. A title with no separator is all `trackTitle` |

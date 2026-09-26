@@ -415,15 +415,84 @@ def test_no_audio_stream_leaves_the_fields_blank(client, monitored):
     assert body["audioChannels"] == ""
 
 
-def test_a_session_without_media_details_reports_an_error(client, monitored):
-    """Known rough edge: an empty ``Media`` list is not handled defensively.
-
-    The IndexError is swallowed by the endpoint's catch-all, so the kiosk simply
-    stays in rotation instead of crashing -- but the cause is only visible here.
-    """
+def test_a_session_without_media_details_still_reports_playback(client, monitored):
+    """An empty ``Media`` list used to raise IndexError and leave the wall in rotation."""
     body = playing(client, monitored, session(Media=[]))
-    assert body["playing"] is False
-    assert "Sessions check failed" in body["error"]
+    assert body["playing"] is True
+    assert body["videoResolution"] == ""
+    assert body["audioCodec"] == ""
+
+
+# --------------------------------------------------------------------------
+# Playback state and offset timing (for the kiosk's locally-driven progress bar)
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("state", ["playing", "paused", "buffering"])
+def test_player_state_is_passed_through(client, monitored, state):
+    body = playing(client, monitored, session(Player={"address": DEVICE, "title": "X", "state": state}))
+    assert body["state"] == state
+
+
+def test_state_defaults_to_playing_when_plex_omits_it(client, monitored):
+    assert playing(client, monitored, session())["state"] == "playing"
+
+
+def test_offset_at_is_the_current_time_in_milliseconds(client, monitored, proxy_app, monkeypatch):
+    monkeypatch.setattr(proxy_app.time, "time", lambda: 1790000000.5)
+    assert playing(client, monitored, session())["offsetAt"] == 1790000000500
+
+
+# --------------------------------------------------------------------------
+# The background monitor's view of the same logic
+# --------------------------------------------------------------------------
+def test_body_function_maps_every_session_to_whether_it_is_monitored(monitored, proxy_app, write_cfg):
+    monitored.route(SESSIONS, FakeResponse(plex_container(
+        session(sessionKey="7", Player={"address": "10.0.0.5"}),
+        session(sessionKey="9"),
+    )))
+    body, seen = proxy_app.now_playing_body(proxy_app.load_cfg(), BASE, "tok123", True)
+    assert body["playing"] is True
+    assert seen == {"7": False, "9": True}
+
+
+def test_monitor_fetch_raises_on_a_plex_error_so_the_last_state_is_kept(monitored, proxy_app):
+    monitored.route(SESSIONS, FakeResponse(status_code=500, ok=False))
+    with pytest.raises(RuntimeError):
+        proxy_app.monitor_fetch(BASE, "tok123", True)
+
+
+def test_monitor_settings_need_devices_url_and_token(write_cfg, proxy_app):
+    write_cfg(plexUrl="plex.test:32400", plexToken="tok123")
+    assert proxy_app.monitor_settings() is None
+    write_cfg(plexUrl="plex.test:32400", plexToken="tok123", plexDevices=[DEVICE])
+    assert proxy_app.monitor_settings() == ("http://plex.test:32400", "tok123", True)
+    write_cfg(plexUrl="plex.test:32400", plexToken="tok123", plexDevices=[DEVICE], plexInsecure=True)
+    assert proxy_app.monitor_settings()[2] is False
+
+
+class _CachedMonitor:
+    def __init__(self, body):
+        self.body = body
+
+    def snapshot(self):
+        return self.body
+
+
+def test_the_endpoint_answers_from_the_monitor_cache_without_calling_plex(client, monitored, proxy_app, monkeypatch):
+    monkeypatch.setattr(proxy_app, "MONITOR", _CachedMonitor({"playing": True, "title": "cached"}))
+    body = client.get("/api/now-playing").get_json()
+    assert body == {"playing": True, "title": "cached"}
+    assert monitored.calls == []
+
+
+def test_a_stale_monitor_falls_back_to_asking_plex(client, monitored, proxy_app, monkeypatch):
+    monkeypatch.setattr(proxy_app, "MONITOR", _CachedMonitor(None))
+    assert playing(client, monitored, session())["title"] == "Arrival"
+
+
+def test_the_monitor_cache_never_bypasses_the_devices_switch(client, write_cfg, plex, proxy_app, monkeypatch):
+    write_cfg(plexUrl=BASE, plexToken="tok123")
+    monkeypatch.setattr(proxy_app, "MONITOR", _CachedMonitor({"playing": True}))
+    assert client.get("/api/now-playing").get_json()["playing"] is False
 
 
 # --------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, requests, urllib3, subprocess, socket, random
+import os, json, pathlib, requests, urllib3, subprocess, socket, random, time
 from urllib.parse import quote_plus
+
+import plex_events
 
 app = Flask(__name__)
 
@@ -322,48 +324,102 @@ def poster():
     )
 
 # ---- Now Playing (check monitored devices) ----
+# When the proxy runs as the Pi service, a plex_events.NowPlayingMonitor keeps this state
+# fresh from Plex's websocket and the endpoint answers from its cache (see __main__). Tests
+# and anything importing the module leave it None, so the endpoint asks Plex directly.
+MONITOR = None
+
 @app.route('/api/now-playing', methods=['GET','OPTIONS'])
 def now_playing():
     if request.method == 'OPTIONS': return ('',204)
-    
+
     srv = load_cfg()
     devices = srv.get('plexDevices', [])
-    
+
     if not devices:
         return jsonify({"playing": False, "message": "No devices configured"})
-    
+
+    if MONITOR is not None:
+        cached = MONITOR.snapshot()
+        if cached is not None:
+            return jsonify(cached)
+
     token = token_from(request)
     if not token:
         return jsonify({"error": "PLEX_TOKEN not configured"}), 400
-    
+
     try:
         base = resolve_base(request)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    
+
     verify_tls = not insecure_from(request)
     if not verify_tls:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    
+
+    body, _sessions = now_playing_body(srv, base, token, verify_tls)
+    return jsonify(body)
+
+
+def monitor_settings():
+    """(base, token, verify_tls) for the background monitor, or None if there is nothing to watch.
+
+    Same precedence as the request helpers, minus the per-request headers the kiosk sends
+    (which carry the same config values anyway).
+    """
+    srv = load_cfg()
+    if not srv.get('plexDevices'):
+        return None
+    token = SERVER_TOKEN or srv.get('plexToken', '').strip()
+    base = (os.environ.get('PLEX_URL', '') or srv.get('plexUrl', '')).strip().rstrip('/')
+    if not token or not base:
+        return None
+    if not (base.startswith('http://') or base.startswith('https://')):
+        base = 'http://' + base
+    verify_tls = not (bool(srv.get('plexInsecure')) or ALLOW_INSECURE_DEFAULT)
+    return (base, token, verify_tls)
+
+
+def monitor_fetch(base, token, verify_tls):
+    """One refresh for the monitor. Raises on failure so the monitor keeps its last good state."""
+    if not verify_tls:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    body, sessions = now_playing_body(load_cfg(), base, token, verify_tls)
+    if 'error' in body:
+        raise RuntimeError(body['error'])
+    return body, sessions
+
+
+def now_playing_body(srv, base, token, verify_tls):
+    """The /api/now-playing body, plus {sessionKey: on a monitored device} for every session.
+
+    The session map lets the monitor ignore push notifications about other people's playback.
+    """
+    devices = srv.get('plexDevices', [])
+    seen = {}
+
     # Check Plex sessions for any of the monitored devices
     sessions_url = f"{base}/status/sessions"
     try:
-        r = requests.get(sessions_url, params={'X-Plex-Token': token}, 
+        r = requests.get(sessions_url, params={'X-Plex-Token': token},
                         headers=PLEX_HEADERS, timeout=TIMEOUT, verify=verify_tls)
         if not r.ok:
-            return jsonify({"playing": False, "error": f"Sessions request failed: {r.status_code}"})
-        
+            return {"playing": False, "error": f"Sessions request failed: {r.status_code}"}, seen
+
         sessions_data = r.json()
         sessions = sessions_data.get('MediaContainer', {}).get('Metadata', [])
-        
+
         # Normalize device IPs for comparison (strip whitespace, lowercase)
         monitored_ips = [device.strip().lower() for device in devices]
-        
+        for session in sessions:
+            address = (session.get('Player', {}).get('address') or '').strip().lower()
+            seen[str(session.get('sessionKey', ''))] = address in monitored_ips
+
         # Look for active sessions on monitored devices
         for session in sessions:
             player = session.get('Player', {})
             player_address = player.get('address', '').strip().lower()
-            
+
             # STRICT IP FILTERING: Only match if player IP is in monitored IPs list
             if player_address not in monitored_ips:
                 continue  # Skip sessions from non-monitored IPs
@@ -444,8 +500,8 @@ def now_playing():
                     f"&token={quote_plus(token)}&w=1200&h=1800&insecure={insecure_q}"
                 )
             
-            # Get media streams for audio/video info
-            media_info = session.get('Media', [{}])[0]
+            # Get media streams for audio/video info (Plex can send an empty Media list)
+            media_info = (session.get('Media') or [{}])[0]
             video_resolution = media_info.get('videoResolution', '')
             video_codec = media_info.get('videoCodec', '')
             
@@ -468,8 +524,15 @@ def now_playing():
             if duration > 0:
                 progress = min(100, max(0, (view_offset / duration) * 100))
             
-            return jsonify({
+            return {
                 "playing": True,
+                # Plex's player state: playing, paused or buffering. The kiosk advances the
+                # bar only while "playing".
+                "state": player.get('state') or 'playing',
+                # When this viewOffset was observed (ms since the epoch, proxy clock = kiosk
+                # clock on the Pi). The monitor keeps the first-seen time while Plex repeats
+                # an unchanged offset between the client's ~10 s reports.
+                "offsetAt": int(time.time() * 1000),
                 "title": title,
                 "year": year,
                 "rating": rating,
@@ -486,12 +549,12 @@ def now_playing():
                 "ratingKey": rating_key,
                 "artist": artist,
                 "trackTitle": track_title
-            })
-        
-        return jsonify({"playing": False, "message": "No active sessions on monitored devices"})
-        
+            }, seen
+
+        return {"playing": False, "message": "No active sessions on monitored devices"}, seen
+
     except Exception as e:
-        return jsonify({"playing": False, "error": f"Sessions check failed: {str(e)}"})
+        return {"playing": False, "error": f"Sessions check failed: {str(e)}"}, seen
 
 # ---- Restart kiosk service ----
 @app.route("/api/restart-kiosk", methods=["POST", "OPTIONS"])
@@ -525,4 +588,6 @@ def debug_routes():
 if __name__ == '__main__':
     # pip install flask requests
     print("Starting Poster Wall Proxy from:", __file__)
-    app.run(host='0.0.0.0', port=8811)
+    MONITOR = plex_events.NowPlayingMonitor(fetch=monitor_fetch, settings=monitor_settings)
+    MONITOR.start()
+    app.run(host='0.0.0.0', port=8811, threaded=True)

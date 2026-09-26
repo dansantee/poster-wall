@@ -67,8 +67,52 @@ init()
  ├─ startRotation(cfg, items) ...... shuffles again client-side, primes poster A,
  │                                   then setInterval(swap, rotateSec * 1000)
  └─ if cfg.plexDevices.length ...... startNowPlayingMonitor(cfg)
-                                     first poll after 1s, then every 5s
+                                     polls /api/now-playing every 1s (POLL_MS)
 ```
+
+## How "now playing" stays current
+
+Two jobs are deliberately separate:
+
+- **Detecting changes** (a start, stop, pause, seek or new item) is push-driven.
+  When `app.py` runs as the service, `__main__` starts a
+  [`plex_events.NowPlayingMonitor`](../proxy/plex_events.py) thread. It keeps
+  Plex's websocket (`/:/websockets/notifications`) open and treats each playback
+  notification about a monitored (or not-yet-seen) session as a trigger to
+  re-fetch `/status/sessions` and rebuild the response with the normal
+  device/library filtering. `/api/now-playing` answers from that cache, so the
+  kiosk's 1 s polls never reach Plex. Notifications about other people's
+  sessions are ignored once the monitor has seen that they aren't on a
+  monitored device.
+- **The progress bar** runs locally in the kiosk. Plex only learns the position
+  from the player's ~10 s reports, so the kiosk extrapolates from the last
+  `viewOffset` and its `offsetAt` timestamp, redrawing every 250 ms, and only
+  while `state` is `playing`. Pause freezes it. A seek or a fresh report resyncs
+  it.
+
+Measured on the real server with an Xbox (2026-09-26):
+- Pause, resume, seek and stop reach Plex within ~1 s.
+- Position reports arrive every 10 s.
+- `/status/sessions` is ~3–5 KB per active session in the house.
+- In a 45 s live run the monitor fetched sessions 6 times; a 1 s poll would have
+  fetched 45 times.
+
+Fallbacks and timing guards:
+- Every triggered refresh is followed by one more 1.5 s later, in case the
+  notification beat `/status/sessions` to the new state.
+- While connected, the monitor still does a safety refresh 30 s after its last
+  attempt. Its wait is capped at that deadline, so a stream of ignored
+  notifications cannot postpone it.
+- An idle socket gets a keepalive ping. No frame within 10 s of a ping counts as
+  a dead connection.
+- If the websocket can't connect (3 s connect timeout) or drops, the monitor
+  polls every 2 s and retries the connection every 10 s.
+- A cache older than 45 s is ignored, and the endpoint asks Plex directly (the
+  path tests always take, because they never start the monitor).
+
+`offsetAt` has a subtlety. Plex repeats the same stale `viewOffset` between
+reports, so the monitor keeps the time an offset was *first* seen, not the time of
+the latest fetch. The kiosk applies the same rule to its own anchor.
 
 Any thrown error in `init()` replaces the page body with a full-screen message
 that names the settings URL — see `showError()`. That is the only error UI; there
@@ -85,9 +129,9 @@ There are exactly two visual states, tracked by the `currentMode` variable:
         │  rotateSec seconds                        │
         └──────────────────────────────────────────┘
              │                            ▲
-   /api/now-playing                       │  /api/now-playing
-   returns playing:true                   │  returns playing:false
-   (checked every 5s)                     │
+   /api/now-playing                       │  /api/now-playing returns
+   returns playing:true                   │  playing:false for 3 s
+   (checked every 1s)                     │  (STOP_GRACE_MS)
              ▼                            │
         ┌──────────────────────────────────────────┐
         │             nowplaying                    │
@@ -101,9 +145,16 @@ Two things about `nowplaying` mode are worth knowing:
 
 - The rotation `setInterval` is **not** cleared. Posters keep swapping behind the
   hidden `#stage`, and the wall resumes mid-rotation when playback stops.
-- Subsequent polls only refresh the progress bar **unless the playing item
-  changed** (a different `ratingKey`, e.g. the next video in a playlist). Then
-  the whole screen is re-rendered for the new item.
+- Subsequent polls only update playback (state, position) **unless the playing
+  item changed** (a different `ratingKey`, e.g. the next video in a playlist).
+  Then the whole screen is re-rendered for the new item.
+- The wall returns to rotation only after 3 s with nothing playing. Plex drops a
+  playlist's old session about 1 s before the next item appears, and without the
+  grace period the posters would flash between songs.
+- **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
+  `placePauseBadge()` positions it from the art's bounding box, because the art
+  sits differently in the movie and music layouts. The wall stays on the
+  now-playing screen while paused. `?state=paused` on a preview URL shows it.
 - `nowplaying` has a music-video variant. When `/api/now-playing` reports
   `mediaType: "musicvideo"` (a session from a `musicVideoSectionId` library),
   `#nowShowing` gets the `music` class, and the layout follows Spotify's
@@ -195,9 +246,6 @@ tests so a future change is deliberate.
   *every* request, then slices `start:start+size`. A library larger than one
   page (500 items) therefore yields overlaps and gaps across pages, because
   page 2 is sliced out of a different shuffle than page 1.
-- **`Media: []` breaks a session.** `/api/now-playing` indexes `Media[0]`
-  unguarded; the resulting `IndexError` is swallowed by the endpoint's
-  catch-all, so the kiosk just stays in rotation.
 - **The settings page cannot send an admin key.** `settings.js` looks for an
   `adminKey` input that `settings.html` does not contain. If `PW_ADMIN_KEY` is
   set on the proxy, saving from the UI fails with 403.

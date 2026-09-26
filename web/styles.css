@@ -434,7 +434,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   height: 100%;
   background-color: var(--progress-bar-color, #F4E88A); /* Fallback color */
   border-radius: 0; /* Remove border radius to match full-width container */
-  transition: width 1s ease;
+  /* app.js redraws the bar every 250 ms from the local playback clock */
+  transition: width 0.25s linear;
   box-shadow: 0 0 15px rgba(244, 232, 138, 0.5);
   width: 0%; /* Start at 0%, JavaScript will set the actual width */
   display: block;
@@ -540,9 +541,54 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   overflow: hidden;
 }
 
-.now-showing > :not(.now-showing-backdrop) {
+.now-showing > :not(.now-showing-backdrop):not(.now-showing-pause) {
   position: relative;
   z-index: 1;
+}
+
+/* Paused (all media): dim the art and centre a pause badge on it. app.js positions the
+   badge from the art's bounding box, since the art sits differently in each layout. */
+.now-showing-poster {
+  transition: filter 0.4s ease;
+}
+
+.now-showing.paused .now-showing-poster {
+  filter: brightness(0.55);
+}
+
+.now-showing-pause {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  width: 18vmin;
+  height: 18vmin;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.now-showing-pause::before,
+.now-showing-pause::after {
+  content: '';
+  position: absolute;
+  top: 28%;
+  width: 13%;
+  height: 44%;
+  border-radius: 1vmin;
+  background: #fff;
+}
+
+.now-showing-pause::before {
+  left: 32%;
+}
+
+.now-showing-pause::after {
+  right: 32%;
+}
+
+.now-showing.paused .now-showing-pause {
+  display: block;
 }
 
 .now-showing-backdrop {

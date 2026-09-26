@@ -36,6 +36,7 @@ REQUIRED_INDEX_IDS = {
     "nowShowingBackdrop",
     "nowShowingArtist",
     "nowShowingSong",
+    "nowShowingPauseBadge",
 }
 
 # The settings page cannot save without these.
@@ -446,6 +447,45 @@ def test_music_video_mode_hides_the_marquee(source):
     css = source(STYLES_CSS)
     rule = re.search(r"\.now-showing\.music \.now-showing-title[^{]*\{([^}]*)\}", css)
     assert rule and "display: none" in rule.group(1)
+
+
+def test_the_kiosk_polls_the_proxy_every_second_with_a_three_second_stop_grace(source):
+    """Measured 2026-09-26: events reach Plex within ~1 s, and a playlist's next item appears
+    ~1 s after the previous session vanishes. 1 s polls are cheap because the proxy answers
+    from its websocket-fed cache; the grace period stops the wall flashing posters between
+    songs."""
+    app_js = source(APP_JS)
+    assert "const POLL_MS = 1000;" in app_js
+    assert "const STOP_GRACE_MS = 3000;" in app_js
+    assert "setTimeout(tick, POLL_MS)" in app_js
+    assert "}, 5000);" not in app_js, "the old 5 s poll is gone"
+
+
+def test_the_progress_bar_runs_from_the_last_report_and_only_while_playing(source):
+    app_js = source(APP_JS)
+    assert "Number(data.offsetAt)" in app_js
+    assert "if (playback.state === 'playing') position += Date.now() - playback.at;" in app_js
+    assert "anchorOffset = playback.offset;\n      anchorAt = playback.at;" in app_js.replace("\r\n", "\n"), (
+        "a repeated report must keep the whole anchor (offset and timestamp)")
+    assert "playback.reported === offset" in app_js, "repeats compare against the reported offset"
+    # Astra pass 1 #1: a state change on an unchanged report freezes/resumes from the
+    # on-screen position instead of snapping back to the stale offset.
+    assert "anchorOffset = positionMs();" in app_js
+    assert "transition: width 0.25s linear" in source(STYLES_CSS)
+
+
+def test_pause_dims_the_art_and_shows_a_badge_for_all_media(source):
+    css = source(STYLES_CSS)
+    assert ".now-showing.paused .now-showing-poster" in css
+    assert ".now-showing.paused .now-showing-pause" in css
+    assert "classList.toggle('paused', state === 'paused')" in source(APP_JS)
+
+
+def test_the_proxy_starts_the_push_monitor_only_as_the_service(source):
+    proxy = source(PROXY_PY)
+    main = proxy[proxy.index("if __name__ == '__main__':"):]
+    assert "NowPlayingMonitor(" in main and "MONITOR.start()" in main
+    assert "MONITOR = None" in proxy[: proxy.index("if __name__ == '__main__':")]
 
 
 def test_music_video_preview_mode_exists(source):
