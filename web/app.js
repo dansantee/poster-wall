@@ -1015,6 +1015,7 @@
       anchorAt = Date.now();
     }
     if (newItem) resetPopups(data.mediaType === 'musicvideo' ? data.facts : []);
+    else if (data.mediaType === 'musicvideo') adoptLateFacts(data.facts);
     playback = {
       key, state,
       offset: anchorOffset,
@@ -1083,6 +1084,13 @@
     // A song change's final animations (the crossfade's art fade-in, the text rise) outlast
     // trackAnimating, so hold off briefly (Astra pass 1 #3).
     popupNotBefore = Date.now() + POPUP_SETTLE_MS;
+  }
+
+  // The proxy's facts lookup can miss the refresh that announced the song (it has a short
+  // timeout so it never delays that news); facts arriving on a later poll are taken up.
+  function adoptLateFacts(facts) {
+    if (popupFacts.length || !Array.isArray(facts)) return;
+    popupFacts = facts.filter(f => typeof f === 'string' && f.trim());
   }
 
   function popOutPopup() {

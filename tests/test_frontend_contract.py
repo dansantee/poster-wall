@@ -633,6 +633,10 @@ def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
     render = app_js[app_js.index("function renderProgress"):app_js.index("// ---- fun-fact bubbles")]
     assert "updatePopup();" in render
     assert "if (newItem) resetPopups(data.mediaType === 'musicvideo' ? data.facts : []);" in app_js
+    # The proxy's facts lookup has a short timeout, so facts can arrive a poll or two into the
+    # song; they're taken up if the song has none yet.
+    assert "else if (data.mediaType === 'musicvideo') adoptLateFacts(data.facts);" in app_js
+    assert "if (popupFacts.length || !Array.isArray(facts)) return;" in popup
     rotation = app_js[app_js.index("function showRotation"):app_js.index("// ---- up next and the gap")]
     assert "resetPopups([]);" in rotation
     change = app_js[app_js.index("function changeTrack"):app_js.index("async function settleTrack")]

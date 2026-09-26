@@ -264,10 +264,141 @@ def test_music_video_library_is_reported_as_a_music_video(client, music_monitore
     assert body["progress"] == 25.0
 
 
+@pytest.fixture(autouse=True)
+def fresh_facts_cache(proxy_app, monkeypatch):
+    """Each test starts with an empty facts cache, and the background lookup runs inline
+    unless a test puts real threads back."""
+    proxy_app._facts_cache.clear()
+    proxy_app._facts_inflight.clear()
+    monkeypatch.setattr(proxy_app, "_run_in_background", lambda fn: fn())
+    yield
+    proxy_app._facts_cache.clear()
+    proxy_app._facts_inflight.clear()
+
+
 def test_music_video_art_is_the_item_poster(client, music_monitored):
-    """The album-art sidecar becomes the Plex poster, so no metadata lookup is needed."""
+    """The album-art sidecar becomes the Plex poster, so the art needs no metadata lookup (the
+    only one is the item's own, for its fun facts)."""
     body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
     assert "239589%2Fthumb%2F1790221703" in body["poster"]
+    assert [c.url for c in music_monitored.calls_matching(METADATA)] == [f"{BASE}/library/metadata/239589"]
+
+
+# --------------------------------------------------------------------------
+# Fun facts (music videos): one per line in the item's Plex summary
+# --------------------------------------------------------------------------
+def metadata_with(summary, rating_key="239589"):
+    return FakeResponse(plex_container({"ratingKey": rating_key, "summary": summary}))
+
+
+def test_music_video_facts_come_from_the_plex_summary_one_per_line(client, music_monitored):
+    music_monitored.route(METADATA, metadata_with("First fact.\n\n  Second fact.  \nThird fact."))
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["facts"] == ["First fact.", "Second fact.", "Third fact."]
+
+
+def test_a_summary_in_the_session_is_used_without_a_lookup(client, music_monitored):
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION, summary="Only fact."))
+    assert body["facts"] == ["Only fact."]
+    assert music_monitored.calls_matching(METADATA) == []
+
+
+def test_facts_are_looked_up_once_per_item_and_again_after_an_edit(client, music_monitored):
+    current = [session(template=MUSIC_VIDEO_SESSION, updatedAt=100)]
+    music_monitored.route(SESSIONS, lambda *a, **k: FakeResponse(plex_container(current[0])))
+    music_monitored.route(METADATA, metadata_with("A fact."))
+    for _ in range(3):
+        client.get("/api/now-playing")
+    assert len(music_monitored.calls_matching(METADATA)) == 1, "cached for the same item"
+    current[0] = session(template=MUSIC_VIDEO_SESSION, updatedAt=200)
+    client.get("/api/now-playing")
+    assert len(music_monitored.calls_matching(METADATA)) == 2, "the summary was edited"
+
+
+def test_a_failed_facts_lookup_means_no_facts_and_is_retried(client, music_monitored):
+    music_monitored.route(METADATA, TimeoutError("slow Plex"))
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert body["playing"] is True and body["facts"] == []
+    playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert len(music_monitored.calls_matching(METADATA)) == 2, "a failure isn't cached"
+
+
+def test_a_slow_facts_lookup_never_holds_back_the_body(client, music_monitored, proxy_app, monkeypatch):
+    """Astra pass 1 #1: the body announcing a new song must not wait for the facts. The
+    lookup runs in the background; the next refresh has them."""
+    import threading, time
+    monkeypatch.setattr(proxy_app, "_run_in_background",
+                        lambda fn: threading.Thread(target=fn, daemon=True).start())
+    release = threading.Event()
+
+    def slow_metadata(call):
+        release.wait(5)
+        return metadata_with("Late fact.")
+
+    music_monitored.route(METADATA, slow_metadata)
+    started = time.monotonic()
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert time.monotonic() - started < 0.5, "returned without waiting for Plex"
+    assert body["playing"] is True and body["facts"] == []
+    release.set()
+    for _ in range(100):
+        if not proxy_app._facts_inflight:
+            break
+        time.sleep(0.02)
+    assert client.get("/api/now-playing").get_json()["facts"] == ["Late fact."]
+
+
+def test_concurrent_misses_share_one_lookup(proxy_app, plex, monkeypatch):
+    """Astra pass 1 #2: the monitor thread and a request thread missing together fetch once."""
+    import threading
+    pending = []
+    monkeypatch.setattr(proxy_app, "_run_in_background", pending.append)   # hold the fetch
+    plex.route(METADATA, metadata_with("A fact."))
+    item = session(template=MUSIC_VIDEO_SESSION, updatedAt=100)
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(
+        proxy_app.music_video_facts(BASE, "tok", True, item))) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(pending) == 1, "one lookup in flight for the item"
+    pending[0]()
+    assert len(plex.calls_matching(METADATA)) == 1
+    assert proxy_app.music_video_facts(BASE, "tok", True, item) == ["A fact."]
+
+
+def test_facts_without_an_updated_at_expire(proxy_app, plex, monkeypatch):
+    """Astra pass 1 #3: with no updatedAt an edit can't be detected, so such entries expire."""
+    plex.route(METADATA, metadata_with("A fact."))
+    bare = session(template=MUSIC_VIDEO_SESSION)
+    bare.pop("updatedAt", None)
+    proxy_app.music_video_facts(BASE, "tok", True, bare)
+    proxy_app.music_video_facts(BASE, "tok", True, bare)
+    assert len(plex.calls_matching(METADATA)) == 1, "cached within the TTL"
+    monkeypatch.setattr(proxy_app, "FACTS_TTL", 0)
+    proxy_app.music_video_facts(BASE, "tok", True, bare)
+    assert len(plex.calls_matching(METADATA)) == 2, "looked up again once expired"
+
+
+def test_the_facts_cache_is_per_plex_server(proxy_app, plex):
+    """Astra pass 1 #4: the same ratingKey on another server is a different item."""
+    plex.route("http://one.test", metadata_with("From one."))
+    plex.route("http://two.test", metadata_with("From two."))
+    item = session(template=MUSIC_VIDEO_SESSION, updatedAt=100)
+    assert proxy_app.music_video_facts("http://one.test", "tok", True, item) == ["From one."]
+    assert proxy_app.music_video_facts("http://two.test", "tok", True, item) == ["From two."]
+
+
+def test_facts_are_capped(client, music_monitored):
+    music_monitored.route(METADATA, metadata_with("\n".join(f"Fact {i}." for i in range(15))))
+    body = playing(client, music_monitored, session(template=MUSIC_VIDEO_SESSION))
+    assert len(body["facts"]) == 10
+
+
+def test_movies_get_no_facts_and_no_lookup_for_them(client, music_monitored):
+    body = playing(client, music_monitored, session())
+    assert "facts" not in body
     assert music_monitored.calls_matching(METADATA) == []
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, re, requests, urllib3, subprocess, socket, random, time
+import os, json, pathlib, re, requests, urllib3, subprocess, socket, random, threading, time
 from urllib.parse import quote_plus
 
 import plex_events
@@ -465,6 +465,71 @@ def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
     return upcoming
 
 
+FACTS_TIMEOUT = 5.0
+FACTS_TTL = 600       # seconds, for entries without an updatedAt (an edit can't be detected)
+MAX_FACTS = 10
+_facts_lock = threading.Lock()
+_facts_cache = {}     # (base, ratingKey, updatedAt) -> (facts, fetched_at); updatedAt changes on an edit
+_facts_inflight = set()
+
+
+def _run_in_background(fn):
+    threading.Thread(target=fn, daemon=True).start()
+
+
+def facts_from_summary(summary):
+    """A music video's fun facts are stored one per line in its Plex summary."""
+    return [line.strip() for line in str(summary or '').splitlines() if line.strip()][:MAX_FACTS]
+
+
+def music_video_facts(base, token, verify_tls, session):
+    """The playing music video's fun facts, for the kiosk's Pop-Up Video style bubbles.
+
+    Taken from the session when Plex includes the summary there. Otherwise the item's metadata
+    is fetched in the background, one lookup per item (and per edit) at a time, and this
+    returns what's cached: nothing the first time. The lookup never runs inside the refresh
+    that announces a new song (Astra pass 1: even a short timeout held that news back); the
+    next refresh carries the facts and the kiosk adopts them. A failed lookup isn't cached.
+    """
+    if session.get('summary'):
+        return facts_from_summary(session['summary'])
+    rating_key = str(session.get('ratingKey') or '')
+    if not rating_key:
+        return []
+    updated = str(session.get('updatedAt') or '')
+    key = (base, rating_key, updated)
+    with _facts_lock:
+        hit = _facts_cache.get(key)
+        if hit and (updated or time.time() - hit[1] < FACTS_TTL):
+            return hit[0]
+        stale = hit[0] if hit else []
+        if key in _facts_inflight:
+            return stale
+        _facts_inflight.add(key)
+
+    def fetch():
+        try:
+            r = requests.get(f"{base}/library/metadata/{rating_key}", params={'X-Plex-Token': token},
+                             headers=PLEX_HEADERS, timeout=min(TIMEOUT, FACTS_TIMEOUT), verify=verify_tls)
+            if r.ok:
+                items = r.json().get('MediaContainer', {}).get('Metadata', []) or []
+                facts = facts_from_summary(items[0].get('summary') if items else '')
+                with _facts_lock:
+                    if len(_facts_cache) > 256:
+                        _facts_cache.clear()
+                    _facts_cache[key] = (facts, time.time())
+        except Exception:
+            pass
+        finally:
+            with _facts_lock:
+                _facts_inflight.discard(key)
+
+    _run_in_background(fetch)
+    with _facts_lock:
+        hit = _facts_cache.get(key)
+    return hit[0] if hit else stale
+
+
 def monitor_fetch(base, token, verify_tls):
     """One refresh for the monitor. Raises on failure so the monitor keeps its last good state."""
     if not verify_tls:
@@ -609,7 +674,7 @@ def now_playing_body(srv, base, token, verify_tls):
             if duration > 0:
                 progress = min(100, max(0, (view_offset / duration) * 100))
             
-            return {
+            body = {
                 "playing": True,
                 # Plex's player state: playing, paused or buffering. The kiosk advances the
                 # bar only while "playing".
@@ -637,7 +702,10 @@ def now_playing_body(srv, base, token, verify_tls):
                 "ratingKey": rating_key,
                 "artist": artist,
                 "trackTitle": track_title
-            }, seen
+            }
+            if is_music_video:
+                body["facts"] = music_video_facts(base, token, verify_tls, session)
+            return body, seen
 
         return {"playing": False, "message": "No active sessions on monitored devices"}, seen
 

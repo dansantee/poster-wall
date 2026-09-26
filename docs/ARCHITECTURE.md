@@ -274,8 +274,21 @@ Two things about `nowplaying` mode are worth knowing:
     characters a second). `updatePopup()` runs on the progress tick from the
     playback position, so a pause holds a bubble and a seek picks that slot's
     fact. Nothing starts in a song's last 15 s or during a song change, and the
-    old song's bubble pops out when a change starts. The proxy doesn't send
-    `facts` yet; only `?preview=musicvideo&demo=popup` has them.
+    old song's bubble pops out when a change starts.
+    - The facts live in the video's **Plex summary, one per line** (locked so a
+      metadata refresh keeps them). `music_video_facts()` in `app.py` reads
+      them from the session if Plex includes the summary there, otherwise
+      with a `/library/metadata/<ratingKey>` lookup.
+    - The lookup runs in a background thread and never inside the refresh
+      that announces a new song. That refresh gets what's cached, nothing the
+      first time. Only one lookup per item is in flight at a time.
+    - Results are cached by `(server, ratingKey, updatedAt)`, so an edit is
+      picked up. Entries without an `updatedAt` expire after 10 minutes, and a
+      failed lookup isn't cached.
+    - The next refresh (the monitor's follow-up comes 1.5 s after a change)
+      carries the facts. The kiosk adopts facts arriving on a later poll
+      (`adoptLateFacts`) if the song has none yet.
+    - `?preview=musicvideo&demo=popup` shows four hardcoded facts.
   - The wall is **1080p portrait (1080×1920, scale 1.0) at 60 Hz** on a 4K TV,
     which upscales. At 4K the Pi 5 drew only 15-20 fps (see RASPBERRY-PI.md,
     `--mode`). Most font sizes are `clamp(min, Nvw, max)`, which hit their pixel
