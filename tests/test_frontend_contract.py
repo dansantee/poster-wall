@@ -611,7 +611,9 @@ def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
     popup = app_js[app_js.index("// ---- fun-fact bubbles"):app_js.index("// Centre the pause badge")]
     assert "let popupTiming = { first: 15000, every: 35000 };" in popup
     assert "const POPUP_END_QUIET_MS = 15000;" in popup
-    assert "return 2000 + String(text).length / 15 * 1000;" in popup
+    # Dan: a little more time; capped so a long fact still fits its 35 s slot (Astra).
+    assert "return Math.min(POPUP_MAX_READ_MS, 3000 + String(text).length / 12 * 1000);" in popup
+    assert "const POPUP_MAX_READ_MS = 20000;" in popup
     # Driven by the playback position (a pause holds the bubble; a seek picks the slot).
     assert "const pos = positionMs();" in popup
     assert "const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);" in popup
@@ -620,8 +622,21 @@ def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
     # start position is stored, not recomputed (a paused bubble must stay); and new bubbles
     # wait out a change's last animations.
     assert "popupShown.has(slot)" in popup and "popupShown.add(slot);" in popup
+    # Dan: the facts loop, each repeating once, a slow stream for anyone who missed one.
+    assert "const POPUP_REPEATS = 2;" in popup
+    assert "slot >= popupFacts.length * POPUP_REPEATS" in popup
+    assert "el.textContent = popupFacts[slot % popupFacts.length];" in popup
+    assert "popupReadMs(popupFacts[slot % popupFacts.length])" in popup
     assert "popupShownSlot" not in popup
-    assert "popupShownAt = pos;" in popup and "pos < popupShownAt" in popup
+    assert "popupShownAt = pos;" in popup
+    # A Plex report re-anchoring the clock steps the position back a little; only a real seek
+    # (more than 3 s back) may end a bubble (they lasted ~0.5 s on real playback).
+    assert "pos < popupShownAt - POPUP_SEEK_BACK_MS" in popup
+    assert "const POPUP_SEEK_BACK_MS = 3000;" in popup
+    # The pop-out's scale(0) fill must not linger: every bubble after the first vanished ~0.5 s
+    # in (when its pop-in ended) on the Pi's kiosk. Hidden, then the pop-out is cancelled.
+    out = popup[popup.index("function popOutPopup"):popup.index("function popInPopup")]
+    assert out.index("el.classList.remove('showing');") < out.index("anim.cancel();")
     assert "popupHideAt - popupReadMs" not in popup
     assert "if (trackAnimating || Date.now() < popupNotBefore) return;" in popup
     assert "popupNotBefore = Date.now() + POPUP_SETTLE_MS;" in popup

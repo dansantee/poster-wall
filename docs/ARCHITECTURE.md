@@ -270,11 +270,26 @@ Two things about `nowplaying` mode are worth knowing:
     of short strings; none means no bubbles) pop up over a corner of the art,
     alternating top-right and bottom-left, with a white balloon whose tail
     points into the art and a "bloop" scale pop in and out. The first comes at
-    15 s, then one per 35 s slot, each held for its reading time (2 s plus 15
-    characters a second). `updatePopup()` runs on the progress tick from the
-    playback position, so a pause holds a bubble and a seek picks that slot's
-    fact. Nothing starts in a song's last 15 s or during a song change, and the
-    old song's bubble pops out when a change starts.
+    15 s, then one per 35 s slot, each held for its reading time (3 s plus 12
+    characters a second).
+    - The slots cycle through the facts, and each fact shows up to twice
+      (`POPUP_REPEATS`), a slow stream for anyone who missed one.
+    - `updatePopup()` runs on the progress tick from the playback position, so
+      a pause holds a bubble and a seek picks that slot's fact. Only a jump
+      back of more than 3 s counts as a seek, since each Plex report
+      re-anchors the clock and can step it back a little.
+    - Nothing starts in a song's last 15 s or during a song change, and the
+      old song's bubble pops out when a change starts.
+    - Each bubble's hold is capped at 20 s, so even a very long fact fits in
+      its slot.
+    - When a pop-out finishes, the bubble is hidden and the pop-out animation
+      cancelled, so its `scale(0)` fill can't linger.
+    - On the Pi's kiosk, every bubble after the first vanished about 0.5 s in,
+      around when its pop-in ended. The suspected cause is that lingering
+      fill; headless Chromium doesn't show it, and the fix hasn't been
+      confirmed on the device yet.
+    - Clock corrections from Plex reports measured only a few ms, so the 3 s
+      seek margin is a safety net, not the cause.
     - The facts live in the video's **Plex summary, one per line** (locked so a
       metadata refresh keeps them). `music_video_facts()` in `app.py` reads
       them from the session if Plex includes the summary there, otherwise

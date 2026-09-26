@@ -1063,6 +1063,14 @@
   // starts in a song's last 15 s or during a song change.
   const POPUP_END_QUIET_MS = 15000;
   const POPUP_SETTLE_MS = 1500;  // after a new item: lets a change's last flourishes finish
+  // Only a jump back further than this counts as a seek. Each ~10 s Plex report re-anchors the
+  // local clock; measured on the Pi the step is only a few ms, so this is a safety margin
+  // rather than the fix for bubbles vanishing early (see popOutPopup).
+  const POPUP_SEEK_BACK_MS = 3000;
+  const POPUP_MAX_READ_MS = 20000;
+  // The slots cycle through the facts: each shows up to this many times, a slow steady stream
+  // for anyone who missed one (Dan: "all the facts should repeat maybe once").
+  const POPUP_REPEATS = 2;
   let popupTiming = { first: 15000, every: 35000 };  // ?demo=popup shortens these
   let popupFacts = [];
   let popupSlot = -1;          // the slot on screen, or -1
@@ -1072,7 +1080,9 @@
   let popupNotBefore = 0;      // wall-clock ms: no new bubble before this
 
   function popupReadMs(text) {
-    return 2000 + String(text).length / 15 * 1000;   // ~15 characters a second, plus 2 s
+    // ~12 characters a second, plus 3 s (Dan wanted a little more time than 15/s + 2 s),
+    // capped so even a very long fact fits in its 35 s slot (Astra).
+    return Math.min(POPUP_MAX_READ_MS, 3000 + String(text).length / 12 * 1000);
   }
 
   function resetPopups(facts) {
@@ -1098,9 +1108,16 @@
     popupSlot = -1;
     if (!el || !el.classList.contains('showing')) return;
     el.getAnimations().forEach(a => a.cancel());
+    // Once it's out: hide it, then cancel the pop-out so its scale(0) fill can't linger. On the
+    // Pi's kiosk every bubble after the first vanished ~0.5 s in (2026-09-26), about when its
+    // pop-in ended; the suspected cause is this fill taking over again there (headless Chromium
+    // didn't show it). Not yet confirmed on the device.
     el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)', offset: 0.3 }, { transform: 'scale(0)' }],
                { duration: 220, easing: 'ease-in', fill: 'forwards' })
-      .finished.then(() => { if (popupSlot === -1) el.classList.remove('showing'); }).catch(() => {});
+      .finished.then(anim => {
+        if (popupSlot === -1) el.classList.remove('showing');
+        anim.cancel();
+      }).catch(() => {});
   }
 
   function popInPopup(slot) {
@@ -1110,7 +1127,7 @@
     const r = poster.getBoundingClientRect();
     const inset = r.width * 0.05;
     const topRight = slot % 2 === 0;   // alternate corners
-    el.textContent = popupFacts[slot];
+    el.textContent = popupFacts[slot % popupFacts.length];
     el.classList.toggle('corner-tr', topRight);
     el.classList.toggle('corner-bl', !topRight);
     Object.assign(el.style, {
@@ -1134,13 +1151,13 @@
     if (popupSlot !== -1) {
       // Done, or a seek back. The start is stored, not recomputed: rounding once made a paused
       // bubble look like a seek back and vanish on the next tick (Astra pass 1 #2).
-      if (trackAnimating || pos >= popupHideAt || pos < popupShownAt) popOutPopup();
+      if (trackAnimating || pos >= popupHideAt || pos < popupShownAt - POPUP_SEEK_BACK_MS) popOutPopup();
       return;
     }
     if (trackAnimating || Date.now() < popupNotBefore) return;
     const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);
-    if (slot < 0 || slot >= popupFacts.length || popupShown.has(slot)) return;
-    const read = popupReadMs(popupFacts[slot]);
+    if (slot < 0 || slot >= popupFacts.length * POPUP_REPEATS || popupShown.has(slot)) return;
+    const read = popupReadMs(popupFacts[slot % popupFacts.length]);
     if (pos + read > popupTiming.first + (slot + 1) * popupTiming.every) return;   // joined too late
     if (playback.duration && pos + read > playback.duration - POPUP_END_QUIET_MS) return;
     popupShownAt = pos;
