@@ -106,10 +106,16 @@ Two things about `nowplaying` mode are worth knowing:
   the whole screen is re-rendered for the new item.
 - `nowplaying` has a music-video variant. When `/api/now-playing` reports
   `mediaType: "musicvideo"` (a session from a `musicVideoSectionId` library),
-  `#nowShowing` gets the `music` class. The marquee shows `musicVideoText`, the
-  art is drawn square over a blurred, darkened copy of itself
-  (`#nowShowingBackdrop`), the metadata badges are hidden, and the artist and
-  song are shown below the art.
+  `#nowShowing` gets the `music` class, and the layout follows Spotify's
+  now-playing screen:
+  - The marquee and metadata badges are hidden.
+  - The square art sits on a solid background, the art's average colour
+    darkened to 55% by `computeBackdropColor()` on a 16×16 canvas and painted
+    on `#nowShowingBackdrop`.
+  - Below the art, left-aligned: the song (bold), then the artist, then a slim
+    white progress bar.
+  - Everything is scoped under `.now-showing.music`, so the movie/TV layout is
+    untouched. CSS `order` re-sequences the shared elements rather than the DOM.
 
 ## Poster transitions
 

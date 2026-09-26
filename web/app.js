@@ -66,7 +66,6 @@
       posterTransitions:!!j.posterTransitions,
       transitionTypes:(j.transitionTypes && Array.isArray(j.transitionTypes)) ? j.transitionTypes : ['crossfade'],
       musicVideoSectionId:Array.isArray(j.musicVideoSectionId) ? j.musicVideoSectionId : (j.musicVideoSectionId ? [String(j.musicVideoSectionId)] : []),
-      musicVideoText:j.musicVideoText?? 'NOW PLAYING',
       plexDevices:   j.plexDevices   ?? []
     };
     
@@ -331,6 +330,27 @@
   }
   function shouldDim(avgLuma){ return avgLuma >= 200; } // tweak if desired
 
+  // Music-video background: the art's average colour, darkened so white text stays readable.
+  function computeBackdropColor(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 16; c.height = 16;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const { data } = ctx.getImageData(0, 0, 16, 16);
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; }
+        const n = data.length / 4, darken = 0.55;
+        resolve(`rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`);
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
   // ---- crossfade plumbing ----
   function preload(src){
     return new Promise((res, rej)=>{
@@ -561,7 +581,7 @@
 
     nowShowing.classList.toggle('music', isMusicVideo);
     if (titleEl) {
-      titleEl.textContent = isMusicVideo ? cfg.musicVideoText : cfg.nowShowingText;
+      titleEl.textContent = cfg.nowShowingText; // hidden by CSS in music-video mode
       applyFontSettings(cfg);
     }
     if (progressBar) {
@@ -570,8 +590,10 @@
     if (poster && data.poster) poster.src = prox(data.poster);
     if (artistEl) artistEl.textContent = isMusicVideo ? (data.artist || '') : '';
     if (songEl) songEl.textContent = isMusicVideo ? (data.trackTitle || data.title || '') : '';
-    if (backdrop) {
-      backdrop.style.backgroundImage = (isMusicVideo && data.poster) ? `url("${prox(data.poster)}")` : '';
+    if (backdrop && isMusicVideo && data.poster) {
+      computeBackdropColor(prox(data.poster)).then(color => {
+        if (color) backdrop.style.backgroundColor = color;
+      });
     }
     currentItemKey = nowPlayingKey(data);
 

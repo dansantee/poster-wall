@@ -77,7 +77,6 @@
         const music = cfg.musicVideoSectionId;
         el('musicVideoSectionId').value = Array.isArray(music) ? music.join(', ') : (music ?? '');
       }
-      if (has('musicVideoText')) el('musicVideoText').value = cfg.musicVideoText ?? 'NOW PLAYING';
       if (has('nowShowingFont')) el('nowShowingFont').value = cfg.nowShowingFont ?? "'Bebas Neue', sans-serif";
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
       if (has('nowShowingKerning')) el('nowShowingKerning').value = cfg.nowShowingKerning ?? 0.1;
@@ -136,7 +135,6 @@
           if (has('musicVideoSectionId')) next.musicVideoSectionId = (el('musicVideoSectionId').value || '').split(',')
             .map(id => id.trim())
             .filter(id => id.length > 0);
-          if (has('musicVideoText')) next.musicVideoText = (el('musicVideoText').value || 'NOW PLAYING').trim();
           if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
           if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
@@ -231,7 +229,6 @@
         if (has('musicVideoSectionId')) next.musicVideoSectionId = (el('musicVideoSectionId').value || '').split(',')
           .map(id => id.trim())
           .filter(id => id.length > 0);
-        if (has('musicVideoText')) next.musicVideoText = (el('musicVideoText').value || 'NOW PLAYING').trim();
         if (has('nowShowingFont')) next.nowShowingFont = el('nowShowingFont').value || "'Bebas Neue', sans-serif";
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
         if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;

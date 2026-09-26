@@ -55,7 +55,6 @@ REQUIRED_SETTINGS_IDS = {
     "btnPreviewNowPlaying",
     "btnPreviewMusicVideo",
     "musicVideoSectionId",
-    "musicVideoText",
     "testOut",
 }
 
@@ -362,7 +361,6 @@ def test_the_proxy_defaults_the_keys_the_kiosk_needs_before_first_save(source):
 # --------------------------------------------------------------------------
 DEFAULTS = [
     ("nowShowingText", "'NOW SHOWING'"),
-    ("musicVideoText", "'NOW PLAYING'"),
     ("nowShowingFont", "\"'Bebas Neue', sans-serif\""),
     ("nowShowingFontSize", "9"),
     ("nowShowingKerning", "0.1"),
@@ -434,6 +432,20 @@ def test_the_kiosk_rerenders_when_the_playing_item_changes(source):
     app_js = source(APP_JS)
     assert "nowPlayingKey(nowPlayingData) !== currentItemKey" in app_js
     assert '"ratingKey": rating_key' in source(PROXY_PY)
+
+
+def test_music_video_background_is_a_solid_colour_from_the_art(source):
+    """Spotify-style: one averaged colour, not a blurred copy of the image."""
+    app_js = source(APP_JS)
+    assert "computeBackdropColor(prox(data.poster))" in app_js
+    assert "backdrop.style.backgroundColor" in app_js
+    assert "backgroundImage" not in app_js
+
+
+def test_music_video_mode_hides_the_marquee(source):
+    css = source(STYLES_CSS)
+    rule = re.search(r"\.now-showing\.music \.now-showing-title[^{]*\{([^}]*)\}", css)
+    assert rule and "display: none" in rule.group(1)
 
 
 def test_music_video_preview_mode_exists(source):
