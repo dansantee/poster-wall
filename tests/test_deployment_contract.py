@@ -134,6 +134,23 @@ def test_rotation_accepts_the_four_quarter_turns(source):
     assert "fbcon=rotate:$FBCON_ROTATE" in setup
 
 
+def test_the_display_mode_can_be_pinned_and_a_pin_survives_a_rerun(source):
+    """The wall's Vizio lists 4K30 as preferred even with 4K60 on offer, so Sway came up at
+    30 Hz; --mode pins 3840x2160@60Hz. A later `./setup.sh --rotate 90` must not drop it."""
+    setup = source(SETUP_SH)
+    assert "--mode)" in setup
+    assert 'SWAY_MODE_LINE="output HDMI-A-1 mode $OUTPUT_MODE"' in setup
+    assert "$SWAY_MODE_LINE" in setup[setup.index('cat >"$SWAY_CONFIG" <<EOF'):]
+    # without --mode, the previous pin is read back from the existing sway config
+    assert "sed -n 's/^output HDMI-A-1 mode \\(.*\\)$/\\1/p' \"$SWAY_CONFIG\"" in setup
+    assert 'if [[ $MODE_GIVEN -eq 0 && -f "$SWAY_CONFIG" ]]; then' in setup, "read back only when --mode is omitted"
+    # --mode auto removes the pin: the exact guard in front of the mode line (Astra pass 1 #2)
+    guard = 'if [[ -n "$OUTPUT_MODE" && "$OUTPUT_MODE" != "auto" ]]; then\n  SWAY_MODE_LINE="output HDMI-A-1 mode $OUTPUT_MODE"'
+    assert guard in setup.replace("\r\n", "\n")
+    # values are validated, and an explicitly empty --mode is rejected (Astra pass 1 #1)
+    assert 'if [[ $MODE_GIVEN -eq 1 && "$OUTPUT_MODE" != "auto" && ! "$OUTPUT_MODE" =~ ^[0-9]+x[0-9]+(@[0-9]+(\\.[0-9]+)?Hz)?$ ]]; then' in setup
+
+
 def test_setup_defaults_to_portrait(source):
     assert shell_var(source(SETUP_SH), "ROTATE_DEG").startswith("90")
 

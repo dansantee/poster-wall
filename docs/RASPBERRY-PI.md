@@ -37,6 +37,25 @@ Run from the repo root, idempotent, safe to re-run:
 transform (degrees) and the framebuffer console rotation (`degrees / 90`). To
 change orientation later, just re-run with a different value.
 
+`--mode` (optional) pins the display mode, e.g. `--mode 3840x2160@60Hz`, as an
+`output HDMI-A-1 mode ...` line in the Sway config.
+- Without it, Sway uses the display's *preferred* mode. The wall's Vizio TV
+  lists 4K at 30 Hz as preferred even when it offers 60 Hz, which made every
+  animation step visibly.
+- Re-running `setup.sh` without `--mode` keeps a previously pinned mode, and
+  `--mode auto` removes the pin.
+- A pinned mode the display doesn't offer is simply not applied by Sway, so
+  check the offered modes first: `swaymsg -t get_outputs`, with `-s
+  /run/user/1000/sway-ipc.*.sock` from an SSH session.
+
+**4K60 on the Pi 5 needs nothing in `config.txt`** (`hdmi_enable_4kp60` is a
+Pi 4 setting). If only 30 Hz is offered at 4K, the TV input is limiting it. On
+the wall's Vizio, that input's HDMI mode was "Compatibility" (a leftover from a
+Pi 3B). Setting it to "Auto" and full 4:4:4 colour made the TV advertise 4K60.
+`/sys/class/drm/card0-HDMI-A-1/edid` shows what the TV offers;
+`sudo sh -c 'echo detect > /sys/class/drm/card0-HDMI-A-1/status'` re-reads it
+after a TV setting change.
+
 ## The three services
 
 ```bash
@@ -170,6 +189,10 @@ it.
 
 **Wrong orientation.** Re-run `./setup.sh --rotate <deg>` and reboot. Sway
 transform and `fbcon` rotation both come from that one flag.
+
+**Animations step or judder.** Check the refresh rate (`swaymsg -t get_outputs`,
+`current_mode`). At 4K 30 Hz, pin 60 Hz with `./setup.sh --rotate 90 --mode
+3840x2160@60Hz` if the TV offers it (see the `--mode` notes above).
 
 **Confirming which code is live.** `GET /api/build-info`, or the Build Status
 panel. `dirty: true` means files on the Pi differ from its commit — normally the

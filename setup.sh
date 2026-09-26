@@ -10,8 +10,11 @@
 # Usage (from repo root containing ./proxy and ./web):
 #   chmod +x setup.sh
 #   ./setup.sh --rotate 90
+#   ./setup.sh --rotate 90 --mode 3840x2160@60Hz   # pin the display mode (e.g. 4K60)
 #
-# Re-run any time; it's idempotent.
+# Re-run any time; it's idempotent. Without --mode, a mode pinned by an earlier run is kept;
+# --mode auto removes the pin (Sway then uses the display's preferred mode, which on some TVs
+# is 4K at only 30 Hz even when 60 Hz is offered).
 
 set -euo pipefail
 
@@ -20,6 +23,9 @@ set -euo pipefail
 #   - fbcon rotation (as rotate:N where N = deg/90 mod 4)
 #   - sway output transform (deg)
 ROTATE_DEG=90   # default 90° (portrait)
+# --mode <WIDTHxHEIGHT[@RATEHz]|auto> pins the sway output mode. Unset = keep the previous pin.
+OUTPUT_MODE=""
+MODE_GIVEN=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --rotate)
@@ -31,13 +37,28 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       ;;
+    --mode)
+      shift
+      if [[ $# -gt 0 ]]; then
+        OUTPUT_MODE="$1"; MODE_GIVEN=1; shift
+      else
+        echo "Error: --mode requires a value (e.g. 3840x2160@60Hz, or auto)"
+        exit 1
+      fi
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 [--rotate 0|90|180|270]"
+      echo "Usage: $0 [--rotate 0|90|180|270] [--mode WIDTHxHEIGHT[@RATEHz]|auto]"
       exit 1
       ;;
   esac
 done
+
+# An explicitly empty value (e.g. --mode "$UNSET_VAR") is an error, not "keep the pin".
+if [[ $MODE_GIVEN -eq 1 && "$OUTPUT_MODE" != "auto" && ! "$OUTPUT_MODE" =~ ^[0-9]+x[0-9]+(@[0-9]+(\.[0-9]+)?Hz)?$ ]]; then
+  echo "Error: --mode must look like 3840x2160@60Hz (or 3840x2160, or auto)"
+  exit 1
+fi
 
 # Normalize ROTATE_DEG to 0,90,180,270
 norm=$(( (ROTATE_DEG % 360 + 360) % 360 ))
@@ -187,11 +208,22 @@ EOF
 
 # Kiosk (Sway + Chromium)
 mkdir -p "$USER_HOME/.config/sway"
-cat >"$USER_HOME/.config/sway/config" <<EOF
+SWAY_CONFIG="$USER_HOME/.config/sway/config"
+# Without --mode, keep a mode pinned by an earlier run rather than silently dropping it.
+if [[ $MODE_GIVEN -eq 0 && -f "$SWAY_CONFIG" ]]; then
+  OUTPUT_MODE="$(sed -n 's/^output HDMI-A-1 mode \(.*\)$/\1/p' "$SWAY_CONFIG" | head -n1)"
+fi
+SWAY_MODE_LINE=""
+if [[ -n "$OUTPUT_MODE" && "$OUTPUT_MODE" != "auto" ]]; then
+  SWAY_MODE_LINE="output HDMI-A-1 mode $OUTPUT_MODE"
+  echo "Display mode pinned: $OUTPUT_MODE"
+fi
+cat >"$SWAY_CONFIG" <<EOF
 # Poster Wall Kiosk (Sway)
 
 # Rotate HDMI output to match CLI flag
 output HDMI-A-1 transform $SWAY_ROTATE_DEG
+$SWAY_MODE_LINE
 
 # Hide the pointer immediately (compositor-level)
 seat * hide_cursor 1
