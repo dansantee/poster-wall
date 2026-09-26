@@ -1,0 +1,6 @@
+# LF everywhere, regardless of a machine's core.autocrlf (Git for Windows defaults to true).
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
