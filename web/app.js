@@ -637,8 +637,8 @@
       poster.onload = placePauseBadge;
       poster.src = prox(data.poster);
     }
-    if (artistEl) artistEl.textContent = isMusicVideo ? (data.artist || '') : '';
-    if (songEl) songEl.textContent = isMusicVideo ? (data.trackTitle || data.title || '') : '';
+    setScrollingText(artistEl, isMusicVideo ? (data.artist || '') : '');
+    setScrollingText(songEl, isMusicVideo ? (data.trackTitle || data.title || '') : '');
     if (backdrop && isMusicVideo && data.poster) {
       const colorsFor = nowPlayingKey(data);
       computeArtColors(prox(data.poster)).then(colors => {
@@ -709,6 +709,49 @@
   // 2026-09-26), so with more queued the screen is held longer, in a "loading" look.
   let queueHasMore = false;
   let upNextShown = null;    // JSON of the items currently drawn, to redraw only on change
+
+  // One line of text that ping-pongs when it's wider than its line (song and artist in the
+  // music layout): pause, slide to the end, pause, slide back. Measured once the web fonts
+  // have loaded, because Montserrat is wider than the fallback it replaces. Web Animations
+  // rather than CSS keyframes, so the pauses stay a fixed length whatever the title length.
+  const SCROLL_PX_PER_SECOND = 70;
+  const SCROLL_PAUSE_MS = 2000;
+
+  function setScrollingText(el, text) {
+    if (!el) return;
+    el.classList.remove('scrolling');
+    el.textContent = '';
+    const span = document.createElement('span');
+    span.className = 'now-showing-scroll';
+    span.textContent = text;
+    el.appendChild(span);
+    const measure = () => {
+      if (span.parentNode !== el) return; // replaced by a newer title meanwhile
+      span.getAnimations().forEach(a => a.cancel());
+      const overflow = span.scrollWidth - el.clientWidth;
+      if (overflow <= 2) { el.classList.remove('scrolling'); return; }
+      const slide = Math.max(1500, overflow / SCROLL_PX_PER_SECOND * 1000);
+      const total = 2 * (SCROLL_PAUSE_MS + slide);
+      const end = `translateX(${-overflow}px)`;
+      span.animate([
+        { transform: 'translateX(0)', offset: 0 },
+        { transform: 'translateX(0)', offset: SCROLL_PAUSE_MS / total, easing: 'ease-in-out' },
+        { transform: end, offset: (SCROLL_PAUSE_MS + slide) / total },
+        { transform: end, offset: (2 * SCROLL_PAUSE_MS + slide) / total, easing: 'ease-in-out' },
+        { transform: 'translateX(0)', offset: 1 }
+      ], { duration: total, iterations: Infinity });
+      el.classList.add('scrolling');
+    };
+    requestAnimationFrame(measure);
+    // Explicitly load this line's own font and measure again when it's there.
+    // `document.fonts.ready` alone can already be settled here, because the web font only
+    // starts loading once music text is shown (Astra pass 1 #1).
+    if (document.fonts && document.fonts.load) {
+      const cs = getComputedStyle(el);
+      document.fonts.load(`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, text)
+        .then(() => requestAnimationFrame(measure), () => {});
+    }
+  }
 
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

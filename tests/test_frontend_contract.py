@@ -469,6 +469,25 @@ def test_a_session_gap_holds_longer_when_more_is_queued(source):
     assert "@keyframes now-showing-spin" in css
 
 
+def test_song_and_artist_stay_on_one_line_and_scroll_when_too_long(source):
+    """Dan: a title wrapping onto a second line threw the layout off badly."""
+    css = source(STYLES_CSS)
+    rule = re.search(r"\.now-showing-artist,\s*\.now-showing-song \{([^}]*)\}", css)
+    assert rule and "white-space: nowrap" in rule.group(1) and "overflow: hidden" in rule.group(1)
+    assert "-webkit-line-clamp: 2" not in rule.group(1)
+    app_js = source(APP_JS)
+    assert "setScrollingText(songEl," in app_js and "setScrollingText(artistEl," in app_js
+    body = app_js[app_js.index("function setScrollingText"):app_js.index("function escapeHtml")]
+    assert "span.textContent = text" in body, "text, not HTML"
+    # Astra pass 1 #1: fonts.ready can already be settled before the web font starts loading,
+    # so the line's own font is loaded explicitly and the text measured again afterwards.
+    assert "document.fonts.load(`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, text)" in body
+    assert ".then(() => requestAnimationFrame(measure)" in body
+    assert "document.fonts.ready.then" not in body
+    assert "span.getAnimations().forEach(a => a.cancel())" in body, "re-measuring restarts, never stacks"
+    assert "iterations: Infinity" in body
+
+
 def test_up_next_titles_are_html_escaped(source):
     """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
     app_js = source(APP_JS)

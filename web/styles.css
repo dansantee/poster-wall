@@ -743,13 +743,18 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* Song and artist stay on one line. When the text is wider than the line, app.js adds
+   .scrolling and animates the inner span back and forth (setScrollingText). */
 .now-showing-artist,
 .now-showing-song {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
+  align-self: stretch;
   overflow: hidden;
-  max-width: 100%;
+  white-space: nowrap;
+}
+
+.now-showing-scroll {
+  display: inline-block;
 }
 
 .now-showing-song {

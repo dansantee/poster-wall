@@ -195,6 +195,13 @@ Two things about `nowplaying` mode are worth knowing:
     white default.
   - Below the art, left-aligned: the song (bold), then the artist, then a slim
     progress bar in the accent colour.
+  - The song and artist lines each stay on **one line**. When one is too wide,
+    `setScrollingText()` ping-pongs it with the Web Animations API: a 2 s pause,
+    a slide to its end at 70 px/s, a 2 s pause, a slide back, repeat. It loads the
+    line's own font explicitly (`document.fonts.load`) and measures again once
+    that font is ready, because Montserrat is wider than its fallback and only
+    starts loading once music text is on screen. Wrapping to a second line used to push the rest of the layout
+    down.
   - Below that, **"Up next"** (label in the accent colour): up to three
     upcoming items from `upNext` as square covers with song and artist, drawn
     by `renderUpNext()`, which HTML-escapes every title.
