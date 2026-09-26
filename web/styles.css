@@ -730,6 +730,10 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-upnext-song {
   margin-top: 1vh;
   -webkit-line-clamp: 2;
+  /* Split two-line titles evenly ("This Is What / You Came For", not "... Came / For"), and
+     always reserve two lines so the artist lines align across the row. */
+  text-wrap: balance;
+  min-height: 2.3em;
   font-size: clamp(14px, 2.8vw, 48px);
   font-weight: 700;
   line-height: 1.15;

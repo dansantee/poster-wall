@@ -488,6 +488,18 @@ def test_song_and_artist_stay_on_one_line_and_scroll_when_too_long(source):
     assert "iterations: Infinity" in body
 
 
+def test_up_next_titles_wrap_evenly_and_keep_the_row_aligned(source):
+    """On the 4K wall "This Is What You Came / For" left one word alone, and one-line titles
+    left the artist lines at different heights across the row."""
+    css = source(STYLES_CSS)
+    rule = re.search(r"\.now-showing-upnext-song \{([^}]*)\}", css)
+    assert rule, "no .now-showing-upnext-song rule"
+    assert "text-wrap: balance;" in rule.group(1)
+    assert "min-height: 2.3em;" in rule.group(1), "two lines reserved (2 x line-height 1.15)"
+    assert "line-height: 1.15;" in rule.group(1)
+    assert "-webkit-line-clamp: 2;" in rule.group(1)
+
+
 def test_up_next_titles_are_html_escaped(source):
     """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
     app_js = source(APP_JS)

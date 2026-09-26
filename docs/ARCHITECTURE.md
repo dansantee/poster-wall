@@ -205,6 +205,17 @@ Two things about `nowplaying` mode are worth knowing:
   - Below that, **"Up next"** (label in the accent colour): up to three
     upcoming items from `upNext` as square covers with song and artist, drawn
     by `renderUpNext()`, which HTML-escapes every title.
+    - Up-next song titles stay still (three more scrolling lines would be too
+      much motion). They get up to two lines with an ellipsis, balanced
+      wrapping (`text-wrap: balance`, so no single word on its own line), and a
+      fixed two-line height, so the artist lines align across the row.
+    - The fixed height also keeps the whole screen still. The music layout is
+      centred vertically, so a row whose height depended on its titles moved
+      everything by ~27 px (at 4K) whenever the queue changed between short
+      and long names.
+  - The wall is **4K portrait (2160×3840, scale 1.0)**. Most font sizes are
+    `clamp(min, Nvw, max)` and hit their pixel caps there, so check layout
+    changes at 2160×3840, not only 1080×1920.
   - Everything is scoped under `.now-showing.music`, so the movie/TV layout is
     untouched. CSS `order` re-sequences the shared elements rather than the DOM.
 
