@@ -505,7 +505,7 @@ def test_up_next_puts_the_artist_above_a_trimmed_song_title(source):
     artist now comes first, so the spare reserved line falls at the bottom of the tile, and
     titles drop their "(...)" / "ft." extras."""
     app_js = source(APP_JS)
-    body = app_js[app_js.index("function renderUpNext"):app_js.index("function holdForNextItem")]
+    body = app_js[app_js.index("function upNextTileHtml"):app_js.index("function renderUpNext")]
     assert body.index("now-showing-upnext-artist") < body.index("now-showing-upnext-song")
     # The trimming itself lives in the proxy (app.short_title, behaviour-tested in
     # test_now_playing_api.py); the kiosk only displays it.
@@ -538,6 +538,35 @@ def test_a_song_change_in_the_music_layout_goes_through_the_transition(source):
     assert ".now-showing-fly {" in css and "transform-origin: top left;" in css
 
 
+def test_the_new_third_tile_fades_in_with_the_slide_not_after_it(source):
+    """Dan: the third tile "kind of fades and slides" after the rest, like an extra step. It now
+    only fades, during the slide when it's known, else as soon as the queue answers."""
+    app_js = source(APP_JS)
+    assert "upNextEnterLast" not in app_js and "translateX(4vw)" not in app_js
+    advance = app_js[app_js.index("async function animateAdvance"):app_js.index("async function animateCrossfade")]
+    fade = advance[advance.index("if (incoming) {"):advance.index("const track = document.querySelector")]
+    assert "entering.animate([{ opacity: 0 }, { opacity: 1 }]" in fade
+    assert "anims.push(" in fade, "part of the advance, so it runs with the slide"
+    assert "gridArea" in fade
+    render = app_js[app_js.index("function renderUpNext"):app_js.index("// ---- song-change transition")]
+    assert "const grows = before.length > 0 && before.length < list.length" in render
+    assert "tile.animate([{ opacity: 0 }, { opacity: 1 }]" in render
+    # Astra pass 1: the late third item arrives by poll, so the first poll after a change is
+    # soon (a full POLL_MS after the transition put it ~1.8 s late), and a crossfade still
+    # fades its third tile in.
+    assert "const AFTER_CHANGE_POLL_MS = 250;" in app_js
+    tick = app_js[app_js.index("async function tick()"):]
+    change = tick[tick.index("await changeTrack(nowPlayingData, cfg);"):]
+    assert change.index("setTimeout(tick, AFTER_CHANGE_POLL_MS)") < change.index("return;") < change.index("} else {")
+    crossfade = app_js[app_js.index("async function animateCrossfade"):app_js.index("function holdForNextItem")]
+    assert "await settleTrack(data, cfg, anims, true);" in crossfade
+    # Astra pass 2: the fade starts as the row is drawn, before the (up to 500 ms) decode wait.
+    settle = app_js[app_js.index("async function settleTrack"):app_js.index("async function animateAdvance")]
+    assert (settle.index("showNowPlaying(data, cfg);")
+            < settle.index("third.animate([{ opacity: 0 }, { opacity: 1 }]")
+            < settle.index("await Promise.race([poster.decode()"))
+
+
 def test_a_failed_or_stalled_transition_cleans_up_and_frees_the_poll_loop(source):
     """Astra pass 1 #1/#2: an exception mid-animation must not leave the clone over the art or
     animations running, and a poster that never decodes must not hold trackAnimating forever."""
@@ -568,10 +597,23 @@ def test_the_flying_cover_is_not_forced_back_into_the_layout(source):
 def test_up_next_titles_are_html_escaped(source):
     """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
     app_js = source(APP_JS)
-    body = app_js[app_js.index("function renderUpNext"):app_js.index("function holdForNextItem")]
+    body = app_js[app_js.index("function upNextTileHtml"):app_js.index("function renderUpNext")]
     assert "escapeHtml(item.shortTitle || item.trackTitle || item.title)" in body
     assert "escapeHtml(item.artist)" in body
     assert "escapeHtml(prox(item.poster))" in body
+    # Both places that build tiles go through it (the advance adds the incoming tile).
+    assert "list.map(upNextTileHtml)" in app_js
+    assert "insertAdjacentHTML('beforeend', upNextTileHtml(incoming))" in app_js
+
+
+def test_the_music_stack_leaves_the_art_a_side_sized_top_margin(source):
+    """Dan: at 1080p the art sat too close to the top. These paddings make the centred stack
+    leave it 54 px from the top at 1080x1920, the same as the 5vw sides (measured in Edge)."""
+    css = source(STYLES_CSS)
+    track = re.search(r"\.now-showing\.music \.now-showing-track \{([^}]*)\}", css).group(1)
+    upnext = re.search(r"\.now-showing\.music \.now-showing-upnext \{([^}]*)\}", css).group(1)
+    assert "padding: 3.5vh 5vw 3vh;" in track
+    assert "padding: 2.5vh 5vw 0;" in upnext
 
 
 def test_music_video_mode_hides_the_marquee(source):

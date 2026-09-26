@@ -573,6 +573,7 @@
   // The proxy answers /api/now-playing from a cache that Plex's websocket keeps fresh, so a
   // 1 s poll costs nothing upstream and stops/changes reach the wall within about a second.
   const POLL_MS = 1000;
+  const AFTER_CHANGE_POLL_MS = 250; // the first poll after a song change, for up next's third item
   // Plex drops the old session before a playlist's next item appears; don't flash the poster
   // rotation in between. Nothing queued: 3 s. More queued: up to 8 s (slow loads measured at
   // 3.9-4.2 s), showing the loading look once it has been more than a normal 0.1-0.5 s gap.
@@ -711,7 +712,6 @@
   // 2026-09-26), so with more queued the screen is held longer, in a "loading" look.
   let queueHasMore = false;
   let upNextShown = null;    // JSON of the items currently drawn, to redraw only on change
-  let upNextEnterLast = false; // set by a song-change transition: fade the new third tile in
 
   // One line of text that ping-pongs when it's wider than its line (song and artist in the
   // music layout): pause, slide to the end, pause, slide back. Measured once the web fonts
@@ -760,42 +760,45 @@
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  function upNextTileHtml(item) {
+    return `<div class="now-showing-upnext-item">` +
+      (item.poster ? `<img src="${escapeHtml(prox(item.poster))}" alt="" />` : '<div class="now-showing-upnext-blank"></div>') +
+      // Artist first: the artists line up under the covers, and a one-line song's spare
+      // (reserved) line falls at the bottom of the tile, where it reads as margin.
+      `<div class="now-showing-upnext-artist">${escapeHtml(item.artist)}</div>` +
+      // shortTitle (from the proxy) drops "(...)" and "ft." extras; the full title stays
+      // for when the song is actually playing.
+      `<div class="now-showing-upnext-song">${escapeHtml(item.shortTitle || item.trackTitle || item.title)}</div>` +
+    `</div>`;
+  }
+
   function renderUpNext(items) {
     const el = document.getElementById('nowShowingUpNext');
     const list = (items || []).slice(0, 3);
     const json = JSON.stringify(list);
     if (!el || json === upNextShown) return;
     upNextShown = json;
+    const before = lastUpNext.map(item => String(item.ratingKey || ''));
     lastUpNext = list;
     el.innerHTML = !list.length ? '' :
       `<div class="now-showing-upnext-label">Up next</div><div class="now-showing-upnext-row">` +
-      list.map(item =>
-        `<div class="now-showing-upnext-item">` +
-          (item.poster ? `<img src="${escapeHtml(prox(item.poster))}" alt="" />` : '<div class="now-showing-upnext-blank"></div>') +
-          // Artist first: the artists line up under the covers, and a one-line song's spare
-          // (reserved) line falls at the bottom of the tile, where it reads as margin.
-          `<div class="now-showing-upnext-artist">${escapeHtml(item.artist)}</div>` +
-          // shortTitle (from the proxy) drops "(...)" and "ft." extras; the full title stays
-          // for when the song is actually playing.
-          `<div class="now-showing-upnext-song">${escapeHtml(item.shortTitle || item.trackTitle || item.title)}</div>` +
-        `</div>`).join('') +
+      list.map(upNextTileHtml).join('') +
       `</div>`;
-    // After an "advance" transition the first two tiles are already where they belong; only
-    // the newly revealed third tile fades in.
-    if (upNextEnterLast) {
-      upNextEnterLast = false;
-      const tiles = el.querySelectorAll('.now-showing-upnext-item');
-      if (tiles.length === 3) {
-        tiles[2].animate([{ opacity: 0, transform: 'translateX(4vw)' }, { opacity: 1, transform: 'none' }],
-                         { duration: 500, easing: TRACK_EASE });
-      }
+    // After a song change the queue's new third item often arrives a moment later (the row is
+    // then the two carried over): tiles that extend the row already on screen fade in.
+    const grows = before.length > 0 && before.length < list.length &&
+                  before.every((key, i) => key && key === String(list[i].ratingKey || ''));
+    if (grows) {
+      [...el.querySelectorAll('.now-showing-upnext-item')].slice(before.length).forEach(tile =>
+        tile.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease-out' }));
     }
   }
 
   // ---- song-change transition (music layout) ----
   // When the song that starts is the first "Up next" item, that cover flies up into the main
   // art slot while the old art fades, the other two tiles slide left one slot and the new
-  // third tile fades in; the song/artist text rises in a beat later. Any other change in the
+  // third tile fades in as they go (or as soon as it's known, if the queue's answer comes a
+  // moment later); the song/artist text rises in a beat later. Any other change in the
   // music layout crossfades. All transforms/opacity (Web Animations), so the Pi's GPU runs it.
   const TRACK_ANIM_MS = 800;
   const TRACK_DECODE_WAIT_MS = 500;
@@ -832,9 +835,14 @@
   }
 
   // Swap in the new item's content, then bring its song/artist text up into place.
-  async function settleTrack(data, cfg, anims) {
-    upNextEnterLast = true;
+  async function settleTrack(data, cfg, anims, fadeThirdTile = false) {
     showNowPlaying(data, cfg);
+    if (fadeThirdTile) {
+      // Crossfades bring the third tile in with the new content (opacity only). Started as the
+      // row is drawn, before the decode wait, or it would show and then blink out (Astra pass 2).
+      const third = document.querySelectorAll('.now-showing-upnext-row > .now-showing-upnext-item')[2];
+      if (third) third.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease-out' });
+    }
     const poster = document.getElementById('nowShowingPoster');
     // Bounded: a stalled image must not hold the poll loop (it waits on trackAnimating).
     if (poster && poster.decode) {
@@ -856,7 +864,13 @@
     if (!poster || !firstImg) return animateCrossfade(data, cfg);
 
     const newSrc = prox(data.poster);
-    await preloadImage(newSrc, 500);   // fly the full-resolution cover, so it's sharp when it lands
+    // The queue's new third item, when it's already known (often it arrives a moment later,
+    // and renderUpNext fades it in then).
+    const incoming = tiles.length === 3 ? (data.upNext || [])[2] : null;
+    await Promise.all([
+      preloadImage(newSrc, 500),   // fly the full-resolution cover, so it's sharp when it lands
+      incoming && incoming.poster ? preloadImage(prox(incoming.poster), 500) : null
+    ]);
     nowShowing.classList.remove('loading', 'paused');
     const from = firstImg.getBoundingClientRect();
     const to = poster.getBoundingClientRect();
@@ -879,6 +893,16 @@
       tiles.slice(1).forEach((tile, i) => anims.push(tile.animate(
         [{ transform: 'translateX(0)' }, { transform: `translateX(${-step}px)` }],
         { duration: TRACK_ANIM_MS * 0.75, delay: 60 + i * 60, easing: TRACK_EASE, fill: 'forwards' })));
+      if (incoming) {
+        // Fade the new third tile into the slot the old one is leaving, during the slide, so
+        // the row moves along in one step. Explicit grid cells let it overlap the old tile.
+        tiles.forEach((tile, i) => { tile.style.gridArea = `1 / ${i + 1}`; });
+        tiles[0].parentElement.insertAdjacentHTML('beforeend', upNextTileHtml(incoming));
+        const entering = tiles[0].parentElement.lastElementChild;
+        entering.style.gridArea = '1 / 3';
+        anims.push(entering.animate([{ opacity: 0 }, { opacity: 1 }],
+          { duration: TRACK_ANIM_MS * 0.6, delay: TRACK_ANIM_MS * 0.3, easing: 'ease-out', fill: 'backwards' }));
+      }
       const track = document.querySelector('.now-showing-track');
       if (track) anims.push(track.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }));
 
@@ -901,7 +925,7 @@
       const track = document.querySelector('.now-showing-track');
       if (track) anims.push(track.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }));
       await Promise.all(anims.map(a => a.finished));
-      await settleTrack(data, cfg, anims);
+      await settleTrack(data, cfg, anims, true);
     } finally {
       anims.forEach(a => a.cancel());
     }
@@ -1052,6 +1076,10 @@
         } else if (nowPlayingKey(nowPlayingData) !== currentItemKey) {
           // Something else started without a stop in between (the next track in a playlist)
           await changeTrack(nowPlayingData, cfg);
+          // The queue's new third item usually reaches the proxy ~0.25 s after the song starts
+          // (measured), so look again soon, not a full poll after the transition (Astra).
+          nowPlayingTimer = setTimeout(tick, AFTER_CHANGE_POLL_MS);
+          return;
         } else {
           applyPlayback(nowPlayingData); // same item: pause/resume, seek, fresh position
         }
@@ -1091,20 +1119,20 @@
         if (new URLSearchParams(location.search).get('state') === 'loading') holdForNextItem(true);
         // &demo=advance plays the song-change transition every 5 s through a looping fake queue
         if (previewMode === 'musicvideo' && new URLSearchParams(location.search).get('demo') === 'advance') {
-          const art = r => ({ title: r.title, artist: r.artist, trackTitle: r.trackTitle, poster: r.poster });
+          const art = r => ({ title: r.title, artist: r.artist, trackTitle: r.trackTitle, poster: r.poster, ratingKey: r.ratingKey });
           let ring = [preview, ...preview.upNext];
           let step = 0;
           setInterval(() => {
             if (trackAnimating || ring.length < 2) return;
             step++;
             ring = [...ring.slice(1), ring[0]];
-            changeTrack({
-              ...preview, ...art(ring[0]),
-              // the song that "starts" is the one the row shows first, so the advance plays
-              ratingKey: lastUpNext[0] ? lastUpNext[0].ratingKey : `demo-${step}`,
-              viewOffset: 0, offsetAt: Date.now(),
-              upNext: ring.slice(1).map((r, i) => ({ ...art(r), ratingKey: `demo-${step}-${i}` }))
-            }, cfg);
+            const upNext = ring.slice(1, 4).map(art);
+            // Every other advance, like real Plex: the new third item isn't known yet when the
+            // song starts (the proxy carries over two) and arrives just after.
+            const late = step % 2 === 0 && upNext.length === 3;
+            changeTrack({ ...preview, ...art(ring[0]), viewOffset: 0, offsetAt: Date.now(),
+                          upNext: late ? upNext.slice(0, 2) : upNext }, cfg)
+              .then(() => { if (late) setTimeout(() => renderUpNext(upNext), 250); });
           }, DEMO_ADVANCE_MS);
         }
         return;

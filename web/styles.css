@@ -662,7 +662,9 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   flex-direction: column;
   align-items: flex-start;
   gap: 0.6vh;
-  padding: 5vh 5vw 3vh;
+  /* With the up-next padding, sized so the centred stack leaves the art about as far from the
+     top as the 5vw side margins at 1080x1920 (Dan, 2026-09-26). */
+  padding: 3.5vh 5vw 3vh;
   text-align: left;
   font-family: 'Montserrat', system-ui, sans-serif;
 }
@@ -705,7 +707,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing.music .now-showing-upnext {
   order: 4;
   display: block;
-  padding: 4vh 5vw 0;
+  padding: 2.5vh 5vw 0;
   font-family: 'Montserrat', system-ui, sans-serif;
 }
 

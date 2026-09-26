@@ -243,10 +243,17 @@ Two things about `nowplaying` mode are worth knowing:
       the full-size poster sits over the main art and is transformed from the
       tile's box to none over 800 ms. The old art fades and shrinks, the other
       two tiles slide one slot left, and the text fades out. The new content
-      then goes in, the song/artist text rises into place, and the new third
-      tile fades in from the right.
+      then goes in and the song/artist text rises into place.
+    - The new third tile only fades. If the queue's third item is already known,
+      it fades into slot 3 during the slide: a temporary tile pinned to grid
+      cell `1 / 3` over the leaving one, discarded when the row is re-rendered.
+      On real Plex it usually isn't known yet (the proxy carries over two items
+      and the lookup adds the third ~0.25 s later), so the kiosk polls again
+      250 ms after the transition (`AFTER_CHANGE_POLL_MS`) and `renderUpNext`
+      fades in any tiles that extend the row already on screen (matched by
+      `ratingKey`).
     - Any other change (a skip, a queue we don't know) crossfades the art and
-      text instead.
+      text instead, and the third tile fades in with the new content.
     - The fly is appended to `#nowShowing`, so it's excluded from the
       `.now-showing > *` rule that makes children `position: relative`;
       otherwise it lands in the flow and pushes the art down.
