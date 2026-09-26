@@ -523,6 +523,48 @@ def test_the_loading_spinner_is_a_fading_ring_that_turns_slowly(source):
     assert "border-top-color" not in body
 
 
+def test_a_song_change_in_the_music_layout_goes_through_the_transition(source):
+    """The first up-next cover flies into the main art when that item starts (matched by
+    ratingKey); other changes crossfade; the poll loop waits while a transition runs."""
+    app_js = source(APP_JS)
+    tick = app_js[app_js.index("async function tick()"):]
+    assert "if (trackAnimating) {" in tick[:200], "the poll loop waits for a running transition"
+    assert "await changeTrack(nowPlayingData, cfg);" in tick
+    change = app_js[app_js.index("function changeTrack"):app_js.index("async function settleTrack")]
+    assert "String(lastUpNext[0].ratingKey) === String(data.ratingKey)" in change
+    assert "animateAdvance(data, cfg) : animateCrossfade(data, cfg)" in change
+    assert "data.mediaType !== 'musicvideo'" in change, "movies/TV keep the instant swap"
+    css = source(STYLES_CSS)
+    assert ".now-showing-fly {" in css and "transform-origin: top left;" in css
+
+
+def test_a_failed_or_stalled_transition_cleans_up_and_frees_the_poll_loop(source):
+    """Astra pass 1 #1/#2: an exception mid-animation must not leave the clone over the art or
+    animations running, and a poster that never decodes must not hold trackAnimating forever."""
+    app_js = source(APP_JS)
+    advance = app_js[app_js.index("async function animateAdvance"):app_js.index("async function animateCrossfade")]
+    cleanup = advance[advance.index("} finally {"):]
+    assert "anims.forEach(a => a.cancel());" in cleanup and "fly.remove();" in cleanup
+    assert "tiles[0].style.visibility = '';" in cleanup
+    assert advance.index("try {") < advance.index("nowShowing.appendChild(fly);")
+    crossfade = app_js[app_js.index("async function animateCrossfade"):app_js.index("function holdForNextItem")]
+    assert "anims.forEach(a => a.cancel());" in crossfade[crossfade.index("} finally {"):]
+    settle = app_js[app_js.index("async function settleTrack"):app_js.index("async function animateAdvance")]
+    assert "await Promise.race([poster.decode()" in settle and "TRACK_DECODE_WAIT_MS" in settle
+    assert "await poster.decode()" not in settle
+
+
+def test_the_flying_cover_is_not_forced_back_into_the_layout(source):
+    """The fly is appended to #nowShowing, whose children get position: relative from a more
+    specific rule; unless it's excluded, the fly lands in the flow and shoves the art down."""
+    css = source(STYLES_CSS)
+    relative_rules = re.findall(r"([^{}]*)\{[^}]*position:\s*relative", css)
+    child_rules = [sel for sel in relative_rules if ".now-showing >" in sel]
+    assert child_rules, "expected the .now-showing > child rule"
+    for sel in child_rules:
+        assert ":not(.now-showing-fly)" in sel, sel.strip()
+
+
 def test_up_next_titles_are_html_escaped(source):
     """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
     app_js = source(APP_JS)

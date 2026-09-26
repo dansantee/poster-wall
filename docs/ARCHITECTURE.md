@@ -133,6 +133,12 @@ Two more rules:
 - A player's recorded queue position is used only while its notification's
   `ratingKey` matches the playing item. Otherwise, such as after a change seen
   only by fallback polling, `upNext` is empty until the next notification.
+- Until the new item's own list is known, `upNext` is what followed that item
+  in the player's last non-empty list (kept across the few seconds with no
+  session between videos). Without it, the first body of the next song carried
+  an empty row, and the kiosk's advance animation blanked the row for a moment.
+  An item not in the old list gets `[]`, and a looked-up list, even an empty
+  one at the end of the queue, always wins.
 
 ## Display modes
 
@@ -229,6 +235,20 @@ Two things about `nowplaying` mode are worth knowing:
       centred vertically, so a row whose height depended on its titles moved
       everything by ~27 px (at 4K) whenever the queue changed between short
       and long names.
+  - **Song changes animate** (`changeTrack()`; music layout only, movies and TV
+    still swap instantly). The poll loop waits while a transition runs.
+    - When the new song is the first up-next item (same `ratingKey`), that
+      cover **flies up into the main art slot**: a `.now-showing-fly` clone of
+      the full-size poster sits over the main art and is transformed from the
+      tile's box to none over 800 ms. The old art fades and shrinks, the other
+      two tiles slide one slot left, and the text fades out. The new content
+      then goes in, the song/artist text rises into place, and the new third
+      tile fades in from the right.
+    - Any other change (a skip, a queue we don't know) crossfades the art and
+      text instead.
+    - The fly is appended to `#nowShowing`, so it's excluded from the
+      `.now-showing > *` rule that makes children `position: relative`;
+      otherwise it lands in the flow and pushes the art down.
   - The wall is **4K portrait (2160×3840, scale 1.0)**. Most font sizes are
     `clamp(min, Nvw, max)` and hit their pixel caps there, so check layout
     changes at 2160×3840, not only 1080×1920.

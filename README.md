@@ -144,7 +144,9 @@ The settings page lets you customize the setup:
   `Artist - Title` files
 - Shows square album art on a background coloured from the art, the song and
   artist, and a progress bar in an accent colour picked from the art
-- "Up next" row with the next three items in the play queue, shuffle included
+- "Up next" row with the next three items in the play queue, shuffle included;
+  when the next song starts, its cover flies up into the main art slot and the
+  row slides along
 - Plex shows a video frame for "Other Videos" by default. For real album art,
   put an `Artist - Title.jpg` next to each video: Plex uses it as the poster,
   and the wall shows that poster.
@@ -192,7 +194,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-306 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
+343 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
 API's behaviour end to end, and — since the frontend has no build step or test
 runner — they also assert the string-level contracts that hold the project
 together: element ids matching the HTML, transition names matching the CSS,

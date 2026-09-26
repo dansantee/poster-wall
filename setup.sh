@@ -134,7 +134,7 @@ fi
 sudo apt-get install -y \
   python3-venv python3-pip \
   sway wayland-protocols \
-  fonts-dejavu fonts-liberation \
+  fonts-dejavu fonts-liberation fonts-noto-cjk \
   seatd
 
 # -------- Choose Chromium path --------

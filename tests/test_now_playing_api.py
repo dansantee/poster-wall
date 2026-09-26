@@ -548,8 +548,17 @@ def test_up_next_titles_outside_music_libraries_are_not_split(write_cfg, plex, p
     write_cfg(musicVideoSectionId=["8"])
     plex.route(QUEUES, FakeResponse(queue_items((1, "Severance - S1E1"), (2, "Severance - S1E2"), section=3)))
     items = proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")
-    assert items == [{"title": "Severance - S1E2", "artist": "", "trackTitle": "Severance - S1E2",
+    assert items == [{"ratingKey": "", "title": "Severance - S1E2", "artist": "", "trackTitle": "Severance - S1E2",
                       "shortTitle": "Severance - S1E2", "poster": items[0]["poster"]}]
+
+
+def test_up_next_items_carry_their_rating_key(write_cfg, plex, proxy_app):
+    """The kiosk animates the first up-next cover into place when that item starts, matched
+    by ratingKey against the next session."""
+    items = queue_items((1, "A - a"), (2, "B - b"))
+    items["MediaContainer"]["Metadata"][1]["ratingKey"] = "239322"
+    plex.route(QUEUES, FakeResponse(items))
+    assert proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")[0]["ratingKey"] == "239322"
 
 
 def test_up_next_at_the_end_of_the_queue_is_empty(write_cfg, plex, proxy_app):

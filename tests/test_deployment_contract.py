@@ -101,6 +101,15 @@ def test_setup_installs_the_proxy_runtime_dependencies(source):
         assert package in installed
 
 
+def test_setup_installs_a_cjk_font(source):
+    """Montserrat has no Hangul/kana/hanzi, and Raspberry Pi OS ships no fallback that does, so
+    an artist like "CHUNG HA (청하)" drew as boxes until fonts-noto-cjk was installed."""
+    setup = source(SETUP_SH)
+    block = re.search(r"^sudo apt-get install -y \\\n((?:  .*\\\n)*  .*)$", setup, re.M)
+    assert block, "expected the main apt-get install block"
+    assert "fonts-noto-cjk" in block.group(1).split()
+
+
 @pytest.mark.parametrize("service", SERVICES)
 def test_the_example_units_cover_each_service(source, service):
     assert service in source(SYSTEMD_EXAMPLES)

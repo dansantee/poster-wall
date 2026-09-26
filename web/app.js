@@ -421,7 +421,9 @@
       preview.mediaType = 'musicvideo';
       preview.artist = 'Weezer';
       preview.trackTitle = 'Buddy Holly';
+      preview.ratingKey = 'preview-0';
       preview.upNext = (items || []).slice(1, 4).map((it, i) => ({
+        ratingKey: `preview-${i + 1}`,
         title: it.title, artist: ['Fiona Apple', 'Duran Duran', 'Sublime'][i], trackTitle: it.title, poster: it.poster
       }));
     }
@@ -709,6 +711,7 @@
   // 2026-09-26), so with more queued the screen is held longer, in a "loading" look.
   let queueHasMore = false;
   let upNextShown = null;    // JSON of the items currently drawn, to redraw only on change
+  let upNextEnterLast = false; // set by a song-change transition: fade the new third tile in
 
   // One line of text that ping-pongs when it's wider than its line (song and artist in the
   // music layout): pause, slide to the end, pause, slide back. Measured once the web fonts
@@ -763,6 +766,7 @@
     const json = JSON.stringify(list);
     if (!el || json === upNextShown) return;
     upNextShown = json;
+    lastUpNext = list;
     el.innerHTML = !list.length ? '' :
       `<div class="now-showing-upnext-label">Up next</div><div class="now-showing-upnext-row">` +
       list.map(item =>
@@ -776,6 +780,133 @@
           `<div class="now-showing-upnext-song">${escapeHtml(item.shortTitle || item.trackTitle || item.title)}</div>` +
         `</div>`).join('') +
       `</div>`;
+    // After an "advance" transition the first two tiles are already where they belong; only
+    // the newly revealed third tile fades in.
+    if (upNextEnterLast) {
+      upNextEnterLast = false;
+      const tiles = el.querySelectorAll('.now-showing-upnext-item');
+      if (tiles.length === 3) {
+        tiles[2].animate([{ opacity: 0, transform: 'translateX(4vw)' }, { opacity: 1, transform: 'none' }],
+                         { duration: 500, easing: TRACK_EASE });
+      }
+    }
+  }
+
+  // ---- song-change transition (music layout) ----
+  // When the song that starts is the first "Up next" item, that cover flies up into the main
+  // art slot while the old art fades, the other two tiles slide left one slot and the new
+  // third tile fades in; the song/artist text rises in a beat later. Any other change in the
+  // music layout crossfades. All transforms/opacity (Web Animations), so the Pi's GPU runs it.
+  const TRACK_ANIM_MS = 800;
+  const TRACK_DECODE_WAIT_MS = 500;
+  const DEMO_ADVANCE_MS = 5000; // ?preview=musicvideo&demo=advance
+  const TRACK_EASE = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
+  let lastUpNext = [];        // the up-next list on screen
+  let trackAnimating = false; // the poll loop waits while a transition runs
+
+  function preloadImage(src, timeoutMs) {
+    return new Promise(resolve => {
+      const img = new Image();
+      let done = false;
+      const finish = ok => { if (!done) { done = true; resolve(ok); } };
+      img.onload = () => finish(true);
+      img.onerror = () => finish(false);
+      setTimeout(() => finish(false), timeoutMs);
+      img.src = src;
+    });
+  }
+
+  function changeTrack(data, cfg) {
+    const nowShowing = document.getElementById('nowShowing');
+    const wasMusic = nowShowing && nowShowing.classList.contains('visible') && nowShowing.classList.contains('music');
+    if (data.mediaType !== 'musicvideo' || !wasMusic || !data.poster) {
+      showNowPlaying(data, cfg);
+      return Promise.resolve();
+    }
+    const advancing = lastUpNext.length > 0 && lastUpNext[0].ratingKey &&
+                      String(lastUpNext[0].ratingKey) === String(data.ratingKey);
+    trackAnimating = true;
+    return (advancing ? animateAdvance(data, cfg) : animateCrossfade(data, cfg))
+      .catch(err => { console.warn('Track transition failed:', err); showNowPlaying(data, cfg); })
+      .finally(() => { trackAnimating = false; });
+  }
+
+  // Swap in the new item's content, then bring its song/artist text up into place.
+  async function settleTrack(data, cfg, anims) {
+    upNextEnterLast = true;
+    showNowPlaying(data, cfg);
+    const poster = document.getElementById('nowShowingPoster');
+    // Bounded: a stalled image must not hold the poll loop (it waits on trackAnimating).
+    if (poster && poster.decode) {
+      await Promise.race([poster.decode().catch(() => {}), new Promise(r => setTimeout(r, TRACK_DECODE_WAIT_MS))]);
+    }
+    anims.forEach(a => a.cancel());
+    const track = document.querySelector('.now-showing-track');
+    if (track) {
+      track.animate([{ opacity: 0, transform: 'translateY(1.5vh)' }, { opacity: 1, transform: 'none' }],
+                    { duration: 450, easing: TRACK_EASE });
+    }
+  }
+
+  async function animateAdvance(data, cfg) {
+    const nowShowing = document.getElementById('nowShowing');
+    const poster = document.getElementById('nowShowingPoster');
+    const tiles = [...document.querySelectorAll('.now-showing-upnext-row > .now-showing-upnext-item')];
+    const firstImg = tiles[0] && tiles[0].querySelector('img');
+    if (!poster || !firstImg) return animateCrossfade(data, cfg);
+
+    const newSrc = prox(data.poster);
+    await preloadImage(newSrc, 500);   // fly the full-resolution cover, so it's sharp when it lands
+    nowShowing.classList.remove('loading', 'paused');
+    const from = firstImg.getBoundingClientRect();
+    const to = poster.getBoundingClientRect();
+
+    const fly = document.createElement('img');
+    fly.className = 'now-showing-fly';
+    fly.src = newSrc;
+    Object.assign(fly.style, { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` });
+    const anims = [];
+    try {
+      nowShowing.appendChild(fly);
+      tiles[0].style.visibility = 'hidden';   // its cover is the one in flight
+      anims.push(fly.animate([
+        { transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
+        { transform: 'none' }
+      ], { duration: TRACK_ANIM_MS, easing: TRACK_EASE, fill: 'forwards' }));
+      anims.push(poster.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.94)' }],
+                                { duration: TRACK_ANIM_MS * 0.55, easing: 'ease-in', fill: 'forwards' }));
+      const step = tiles[1] ? tiles[1].getBoundingClientRect().left - tiles[0].getBoundingClientRect().left : 0;
+      tiles.slice(1).forEach((tile, i) => anims.push(tile.animate(
+        [{ transform: 'translateX(0)' }, { transform: `translateX(${-step}px)` }],
+        { duration: TRACK_ANIM_MS * 0.75, delay: 60 + i * 60, easing: TRACK_EASE, fill: 'forwards' })));
+      const track = document.querySelector('.now-showing-track');
+      if (track) anims.push(track.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }));
+
+      await Promise.all(anims.map(a => a.finished));
+      await settleTrack(data, cfg, anims);
+    } finally {
+      // Also on failure, so changeTrack's fallback render isn't left under a stray clone.
+      anims.forEach(a => a.cancel());
+      fly.remove();
+      tiles[0].style.visibility = '';
+    }
+  }
+
+  async function animateCrossfade(data, cfg) {
+    const poster = document.getElementById('nowShowingPoster');
+    await preloadImage(prox(data.poster), 500);
+    const anims = [];
+    try {
+      if (poster) anims.push(poster.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: 'ease-in', fill: 'forwards' }));
+      const track = document.querySelector('.now-showing-track');
+      if (track) anims.push(track.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }));
+      await Promise.all(anims.map(a => a.finished));
+      await settleTrack(data, cfg, anims);
+    } finally {
+      anims.forEach(a => a.cancel());
+    }
+    if (poster) poster.animate([{ opacity: 0, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }],
+                               { duration: 450, easing: TRACK_EASE });
   }
 
   // The session vanished: stop the bar where it is and, if more is queued, show that the next
@@ -908,14 +1039,19 @@
 
     // One poll at a time: the next is scheduled only after this one finishes.
     async function tick() {
+      if (trackAnimating) {           // let a song-change transition finish undisturbed
+        nowPlayingTimer = setTimeout(tick, POLL_MS);
+        return;
+      }
       const nowPlayingData = await checkNowPlaying(cfg);
 
       if (nowPlayingData.playing) {
         missingSince = null;
-        if (currentMode !== 'nowplaying' || nowPlayingKey(nowPlayingData) !== currentItemKey) {
-          // Playback started, or something else started without a stop in between
-          // (the next track in a playlist)
-          showNowPlaying(nowPlayingData, cfg);
+        if (currentMode !== 'nowplaying') {
+          showNowPlaying(nowPlayingData, cfg);   // playback started
+        } else if (nowPlayingKey(nowPlayingData) !== currentItemKey) {
+          // Something else started without a stop in between (the next track in a playlist)
+          await changeTrack(nowPlayingData, cfg);
         } else {
           applyPlayback(nowPlayingData); // same item: pause/resume, seek, fresh position
         }
@@ -949,9 +1085,28 @@
         } catch {
           previewItems = [];
         }
-        showNowPlaying(makePreviewNowPlaying(previewItems, previewMode === 'musicvideo'), cfg);
+        const preview = makePreviewNowPlaying(previewItems, previewMode === 'musicvideo');
+        showNowPlaying(preview, cfg);
         // ?state=loading previews the hold between queue items
         if (new URLSearchParams(location.search).get('state') === 'loading') holdForNextItem(true);
+        // &demo=advance plays the song-change transition every 5 s through a looping fake queue
+        if (previewMode === 'musicvideo' && new URLSearchParams(location.search).get('demo') === 'advance') {
+          const art = r => ({ title: r.title, artist: r.artist, trackTitle: r.trackTitle, poster: r.poster });
+          let ring = [preview, ...preview.upNext];
+          let step = 0;
+          setInterval(() => {
+            if (trackAnimating || ring.length < 2) return;
+            step++;
+            ring = [...ring.slice(1), ring[0]];
+            changeTrack({
+              ...preview, ...art(ring[0]),
+              // the song that "starts" is the one the row shows first, so the advance plays
+              ratingKey: lastUpNext[0] ? lastUpNext[0].ratingKey : `demo-${step}`,
+              viewOffset: 0, offsetAt: Date.now(),
+              upNext: ring.slice(1).map((r, i) => ({ ...art(r), ratingKey: `demo-${step}-${i}` }))
+            }, cfg);
+          }, DEMO_ADVANCE_MS);
+        }
         return;
       }
 

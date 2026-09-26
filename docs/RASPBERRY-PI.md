@@ -17,8 +17,9 @@ Run from the repo root, idempotent, safe to re-run:
 ```
 
 1. **Installs packages** — `chromium-browser` (falls back to `chromium`),
-   `python3-venv`, `sway`, `wayland-protocols`, DejaVu and Liberation fonts, and
-   `seatd`.
+   `python3-venv`, `sway`, `wayland-protocols`, DejaVu and Liberation fonts,
+   Noto CJK (`fonts-noto-cjk`, so Korean/Japanese/Chinese titles don't draw as
+   boxes; Montserrat has no such glyphs), and `seatd`.
 2. **Adds you to `video`, `render` and `input`** so Sway can reach DRM and input
    devices, and enables `seatd`. If any group was added, reboot.
 3. **Creates a venv at `<repo>/.venv`** and installs `flask`, `requests`,

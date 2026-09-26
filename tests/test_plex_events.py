@@ -601,6 +601,55 @@ def test_a_queue_position_for_a_different_item_is_not_used():
     assert qcalls == [("47799", "1")], "and no lookup with the stale position"
 
 
+KEYED_UP = [{"ratingKey": "6", "title": "Fiona Apple - Criminal"},
+            {"ratingKey": "7", "title": "Duran Duran - Come Undone"},
+            {"ratingKey": "8", "title": "Sublime - Santeria"}]
+
+
+def test_until_the_new_item_is_looked_up_the_rest_of_the_old_list_is_shown():
+    """The next item's state is published before its queue lookup, so its first body used to
+    carry an empty row: the kiosk's advance animation then blanked the row for a moment. What
+    followed that item in the last known list is still coming, across the gap between videos."""
+    seen_during_lookup = []
+    m, clock, calls = make_monitor([PLAYING_XBOX, {"playing": False}, dict(PLAYING_XBOX, ratingKey="6")])
+    results = [KEYED_UP, KEYED_UP[1:] + [{"ratingKey": "9", "title": "Blur - Song 2"}]]
+
+    def queue_fetch(base, token, verify, queue_id, item_id):
+        seen_during_lookup.append(m.snapshot())
+        return results.pop(0)
+
+    m._queue_fetch = queue_fetch
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.refresh(CFG)                                   # the ~4 s with no session between videos
+    m.wants_refresh(queue_note(2, rating_key="6"))
+    m.refresh(CFG)
+    assert seen_during_lookup[1]["upNext"] == KEYED_UP[1:]
+    assert [i["ratingKey"] for i in m.snapshot()["upNext"]] == ["7", "8", "9"], "then the real list"
+
+
+def test_an_item_seen_only_by_polling_also_gets_the_rest_of_the_old_list():
+    m, clock, calls = make_monitor([PLAYING_XBOX, dict(PLAYING_XBOX, ratingKey="7")],
+                                   queue_fetch=with_queue([KEYED_UP])[0])
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.refresh(CFG)                                   # moved on (skipping one), no notification yet
+    assert m.snapshot()["upNext"] == KEYED_UP[2:]
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == KEYED_UP[2:], "Astra pass 2: and it lasts past one refresh"
+
+
+def test_an_end_of_queue_lookup_is_not_replaced_by_the_old_list():
+    m, clock, calls = make_monitor([PLAYING_XBOX, dict(PLAYING_XBOX, ratingKey="6")],
+                                   queue_fetch=with_queue([KEYED_UP, []])[0])
+    m.wants_refresh(queue_note(1))
+    m.refresh(CFG)
+    m.wants_refresh(queue_note(2, rating_key="6"))
+    m.refresh(CFG)
+    m.refresh(CFG)
+    assert m.snapshot()["upNext"] == [], "the queue says nothing follows, and that wins"
+
+
 def test_no_queue_known_yet_means_no_up_next_and_no_lookup():
     queue_fetch, qcalls = with_queue([UP])
     m, clock, calls = make_monitor([PLAYING_XBOX], queue_fetch=queue_fetch)

@@ -542,7 +542,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   overflow: hidden;
 }
 
-.now-showing > :not(.now-showing-backdrop):not(.now-showing-pause) {
+.now-showing > :not(.now-showing-backdrop):not(.now-showing-pause):not(.now-showing-fly) {
   position: relative;
   z-index: 1;
 }
@@ -687,6 +687,19 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing-upnext {
   display: none;
+}
+
+/* The up-next cover in flight during a song change (app.js animateAdvance). It's positioned
+   over the main art and transformed from the tile's box, so the origin must be top-left. */
+.now-showing-fly {
+  position: fixed;
+  z-index: 3;
+  object-fit: cover;
+  border-radius: 1.2vw;
+  box-shadow: 0 1.5vh 5vh rgba(0, 0, 0, 0.45);
+  transform-origin: top left;
+  will-change: transform;
+  pointer-events: none;
 }
 
 .now-showing.music .now-showing-upnext {

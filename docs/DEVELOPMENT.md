@@ -59,6 +59,10 @@ parameter:
 
 Either now-playing preview also takes `&state=paused` (the pause dim and badge)
 or `&state=loading` (the spinner shown while waiting for a queue's next item).
+`?preview=musicvideo&demo=advance` plays the song-change transition every 5 s,
+rotating through the preview's items. A screenshot can't show motion, so to
+check it headlessly, capture frames over the DevTools protocol at a few moments
+during the 800 ms animation.
 
 `?preview=nowplaying` is the only way to iterate on the marquee layout without
 actually starting playback on a monitored device. Note that the fake session has
@@ -72,7 +76,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-225 tests, well under a second, no network and no Plex server. They never touch
+343 tests, a couple of seconds, no network and no Plex server. They never touch
 your real `proxy/config.json`. See [TESTING.md](TESTING.md) for what is covered
 and how to add to it.
 

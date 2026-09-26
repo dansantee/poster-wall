@@ -239,6 +239,7 @@ class NowPlayingMonitor:
         self._sessions = {}
         self._queues = {}        # player clientIdentifier -> (playQueueID, playQueueItemID, ratingKey)
         self._up_next = {}       # (playQueueID, playQueueItemID) -> upcoming items
+        self._last_up_next = {}  # player clientIdentifier -> (ratingKey, the last non-empty upNext published for it)
         self.mode = "starting"   # starting | idle | push | poll
         self.last_error = None
 
@@ -256,6 +257,7 @@ class NowPlayingMonitor:
         lookup = None
         if body.get("playing"):
             body["upNext"], lookup = self._known_upcoming(body)
+            self._remember_up_next(body)
         self._publish(body, sessions)
         # The playback state is published first: a slow queue lookup must never hold back the
         # news that the next item started (Astra pass 1 #1). The lookup then patches upNext in.
@@ -265,6 +267,12 @@ class NowPlayingMonitor:
                 with self._lock:
                     if self._body and self._body.get("ratingKey") == body.get("ratingKey"):
                         self._body = dict(self._body, upNext=items)
+                self._remember_up_next(dict(body, upNext=items))
+
+    def _remember_up_next(self, body):
+        if body.get("upNext"):
+            with self._lock:
+                self._last_up_next[body.get("playerId")] = (str(body.get("ratingKey", "")), list(body["upNext"]))
 
     def _publish(self, body, sessions):
         now_ms = int(self._clock() * 1000)
@@ -295,16 +303,28 @@ class NowPlayingMonitor:
         with self._lock:
             entry = self._queues.get(body.get("playerId"))
             prev = self._body
+            remaining = self._remaining(body)
             if (not entry or self._queue_fetch is None
                     or entry[2] != str(body.get("ratingKey", ""))):
-                return [], None
+                return remaining, None
             key = entry[:2]
             cached = self._up_next.get(key)
         if cached is not None:
             return cached, None
         # Not looked up yet: keep what we had for this same item rather than blanking the row.
         same_item = prev and prev.get("ratingKey") == body.get("ratingKey")
-        return (list(prev.get("upNext") or []) if same_item else []), key
+        return (list(prev.get("upNext") or []) if same_item else remaining), key
+
+    def _remaining(self, body):
+        """What followed this item in the player's last known up-next list (``[]`` if it wasn't
+        in it). Until the new item's own lookup lands, that is still what's coming, and the
+        kiosk's advance animation needs the row to stay (caller holds the lock)."""
+        owner, last = self._last_up_next.get(body.get("playerId")) or ("", [])
+        rating_key = str(body.get("ratingKey", ""))
+        if owner == rating_key:                      # already this item's list (Astra pass 2)
+            return list(last)
+        keys = [str(item.get("ratingKey", "")) for item in last]
+        return list(last[keys.index(rating_key) + 1:]) if rating_key in keys else []
 
     def _lookup_upcoming(self, cfg, key):
         """Fetch one queue item's up-next list. None (queue not caught up, or an error) is not

@@ -453,6 +453,9 @@ def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
         is_music = str(item.get('librarySectionID', '')) in music and sep
         thumb = item.get('thumb')
         upcoming.append({
+            # The kiosk matches the next playing item against upNext[0] by this, to animate
+            # the first up-next cover into the main art slot.
+            "ratingKey": str(item.get('ratingKey', '')),
             "title": title,
             "artist": artist if is_music else '',
             "trackTitle": track if is_music else title,
