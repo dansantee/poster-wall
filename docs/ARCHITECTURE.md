@@ -180,8 +180,9 @@ Two things about `nowplaying` mode are worth knowing:
   - **More queued:** wait up to 8 s (`QUEUE_GRACE_MS`), with the "loading" look
     after 1 s (`LOADING_LOOK_AFTER_MS`, so normal gaps never show it): the art
     dims and the pause badge becomes a spinner: a ring that fades around its
-    length, turning every 1.5 s. The wall runs 4K at **30 Hz**, where a solid
-    arc turning once a second visibly stepped. The cost is that a real Stop
+    length, turning every 1.5 s. It was designed when the wall ran 4K at
+    **30 Hz**, where a solid arc turning once a second visibly stepped (it now
+    runs 1080p60). The cost is that a real Stop
     mid-queue holds this look for up to 8 s.
   - `?state=loading` on a preview URL shows the loading look.
 - **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
@@ -249,9 +250,11 @@ Two things about `nowplaying` mode are worth knowing:
     - The fly is appended to `#nowShowing`, so it's excluded from the
       `.now-showing > *` rule that makes children `position: relative`;
       otherwise it lands in the flow and pushes the art down.
-  - The wall is **4K portrait (2160×3840, scale 1.0)**. Most font sizes are
-    `clamp(min, Nvw, max)` and hit their pixel caps there, so check layout
-    changes at 2160×3840, not only 1080×1920.
+  - The wall is **1080p portrait (1080×1920, scale 1.0) at 60 Hz** on a 4K TV,
+    which upscales. At 4K the Pi 5 drew only 15-20 fps (see RASPBERRY-PI.md,
+    `--mode`). Most font sizes are `clamp(min, Nvw, max)`, which hit their pixel
+    caps at 4K and not at 1080, so check layout changes at 1080×1920 (and at
+    2160×3840 if the wall ever goes back to 4K).
   - Everything is scoped under `.now-showing.music`, so the movie/TV layout is
     untouched. CSS `order` re-sequences the shared elements rather than the DOM.
 

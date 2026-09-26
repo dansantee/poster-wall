@@ -38,8 +38,17 @@ Run from the repo root, idempotent, safe to re-run:
 transform (degrees) and the framebuffer console rotation (`degrees / 90`). To
 change orientation later, just re-run with a different value.
 
-`--mode` (optional) pins the display mode, e.g. `--mode 3840x2160@60Hz`, as an
+`--mode` (optional) pins the display mode, e.g. `--mode 1920x1080@60Hz`, as an
 `output HDMI-A-1 mode ...` line in the Sway config.
+- **On a 4K TV, use 1080p60.** Measured on the wall (Pi 5, Chromium 139, Sway 1.7,
+  portrait) with the music preview's song-change animation: at 3840x2160@60Hz the
+  kiosk drew about 20 fps at rest and 15 fps while animating. At 1920x1080@60Hz it
+  holds 60 fps through the same animation. The limit is pixels per frame, not
+  CPU (no thread was over a quarter busy): the Pi's display planes can't rotate,
+  so Sway re-draws the whole rotated screen every frame on top of Chromium's own
+  compositing. Trimming Chromium's own work (layers, GPU-only animations) made no
+  measurable difference at 4K. The TV upscales 1080p, and most artwork is smaller
+  than that anyway.
 - Without it, Sway uses the display's *preferred* mode. The wall's Vizio TV
   lists 4K at 30 Hz as preferred even when it offers 60 Hz, which made every
   animation step visibly.
@@ -191,9 +200,9 @@ it.
 **Wrong orientation.** Re-run `./setup.sh --rotate <deg>` and reboot. Sway
 transform and `fbcon` rotation both come from that one flag.
 
-**Animations step or judder.** Check the refresh rate (`swaymsg -t get_outputs`,
-`current_mode`). At 4K 30 Hz, pin 60 Hz with `./setup.sh --rotate 90 --mode
-3840x2160@60Hz` if the TV offers it (see the `--mode` notes above).
+**Animations step or judder.** Check the mode (`swaymsg -t get_outputs`,
+`current_mode`). At 4K, at 30 or 60 Hz, pin 1080p60 with `./setup.sh --rotate 90
+--mode 1920x1080@60Hz` (see the `--mode` notes above).
 
 **Confirming which code is live.** `GET /api/build-info`, or the Build Status
 panel. `dirty: true` means files on the Pi differ from its commit — normally the

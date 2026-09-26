@@ -227,7 +227,7 @@ and verification steps are in
 
 - I've only tested this on a Pi 5, but other models might work fine
 - If you need different rotations, use different `--rotate` values (0, 90, 180, 270) when running `setup.sh` (it can be run multiple times)
-- On a 4K TV, check the refresh rate. Some TVs prefer 4K at 30 Hz, which makes animations judder. `./setup.sh --rotate 90 --mode 3840x2160@60Hz` pins 60 Hz; see [RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
+- On a 4K TV, run the wall at 1080p60: `./setup.sh --rotate 90 --mode 1920x1080@60Hz`. A Pi 5 driving a rotated 4K screen manages only 15-20 fps, so every animation judders; at 1080p it holds 60 fps and the TV upscales. See [RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
 - Settings take effect on the wall at the next page load — hit "Restart Kiosk"
   after saving
 
