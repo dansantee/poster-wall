@@ -173,7 +173,9 @@ Two things about `nowplaying` mode are worth knowing:
     (`STOP_GRACE_MS`).
   - **More queued:** wait up to 8 s (`QUEUE_GRACE_MS`), with the "loading" look
     after 1 s (`LOADING_LOOK_AFTER_MS`, so normal gaps never show it): the art
-    dims and the pause badge becomes a spinner. The cost is that a real Stop
+    dims and the pause badge becomes a spinner: a ring that fades around its
+    length, turning every 1.5 s. The wall runs 4K at **30 Hz**, where a solid
+    arc turning once a second visibly stepped. The cost is that a real Stop
     mid-queue holds this look for up to 8 s.
   - `?state=loading` on a preview URL shows the loading look.
 - **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
@@ -205,10 +207,24 @@ Two things about `nowplaying` mode are worth knowing:
   - Below that, **"Up next"** (label in the accent colour): up to three
     upcoming items from `upNext` as square covers with song and artist, drawn
     by `renderUpNext()`, which HTML-escapes every title.
+    - Each tile shows the **artist above the song**. The song is the item's
+      `shortTitle` from the proxy (`short_title()` in `app.py`), which drops the
+      extras:
+      - bracketed groups that follow other text ("(from the series ...)",
+        "[Remastered]"), including nested groups and groups right after a
+        dropped one
+      - anything after "ft.", "feat." or "featuring"
+
+      A leading group, as in "(Don't Fear) The Reaper", stays, and so does a
+      group glued to a word ("Baby(One More Time)"). A title that would trim to
+      nothing is kept whole. The playing song still shows its full title.
+      About 1 in 5 library titles gets shortened.
     - Up-next song titles stay still (three more scrolling lines would be too
       much motion). They get up to two lines with an ellipsis, balanced
       wrapping (`text-wrap: balance`, so no single word on its own line), and a
-      fixed two-line height, so the artist lines align across the row.
+      fixed two-line height. Because the song comes after the artist, a
+      one-line title's spare line falls at the bottom of the tile, where it
+      reads as margin rather than as a gap before the artist.
     - The fixed height also keeps the whole screen still. The music layout is
       centred vertically, so a row whose height depended on its titles moved
       everything by ~27 px (at 4K) whenever the queue changed between short

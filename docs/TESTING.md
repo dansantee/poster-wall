@@ -40,10 +40,10 @@ So the suite has two halves:
 | `test_config_api.py` | 20 | `GET`/`PUT` `/api/config`: defaults, round-trip, replace-not-merge, URL normalisation, admin key |
 | `test_movies_api.py` | 30 | `/api/movies`: URL/token resolution, multi-section fan-out, type + artwork filtering, paging and clamps, poster URL shape |
 | `test_poster_api.py` | 23 | `/api/poster`: the transcode URL, streaming, caching, TLS flags, 502 on upstream failure |
-| `test_now_playing_api.py` | 77 | `/api/now-playing`: device whitelist, library whitelist, media-type filter, music videos, progress maths, `state`/`offsetAt`/`playerId`, audio-channel labels, the whole episode-artwork fallback chain, the monitor cache and its direct fallback, `monitor_queue()` (up next) |
+| `test_now_playing_api.py` | 98 | `/api/now-playing`: device whitelist, library whitelist, media-type filter, music videos, progress maths, `state`/`offsetAt`/`playerId`, audio-channel labels, the whole episode-artwork fallback chain, the monitor cache and its direct fallback, `monitor_queue()` (up next) and `short_title()` |
 | `test_plex_events.py` | 45 | `plex_events.py`: the websocket client's framing, ping/pong, close, and overall (not per-read) handshake and receive deadlines; the monitor's trigger filtering, follow-up and safety refreshes, `offsetAt` rule, keepalive, poll fallback and reconnects, and per-queue-item up-next caching |
 | `test_restart_kiosk.py` | 10 | `/api/restart-kiosk`: the exact systemctl command, admin key, timeout and failure handling |
-| `test_frontend_contract.py` | 60 | Element ids, transitions ↔ CSS, custom properties ↔ `:root`, icon files, fonts, config-key coverage, shared defaults |
+| `test_frontend_contract.py` | 64 | Element ids, transitions ↔ CSS, custom properties ↔ `:root`, icon files, fonts, config-key coverage, shared defaults |
 | `test_deployment_contract.py` | 31 | Ports, systemd unit names, rotation flags, `SECRETS.md` labels, gitignore hygiene |
 
 ## Fixtures worth knowing

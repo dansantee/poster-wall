@@ -594,18 +594,20 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   display: block;
 }
 
-/* Waiting for the queue's next item: the badge becomes a spinner ring */
+/* Waiting for the queue's next item: the badge becomes a spinner ring. The wall runs 4K at
+   30 Hz, where a solid arc turning once a second visibly steps 12 degrees a frame; a ring
+   that fades around its length, turning more slowly, hides the frame steps. */
 .now-showing.loading .now-showing-pause::before {
   top: 22%;
   left: 22%;
   width: 56%;
   height: 56%;
-  box-sizing: border-box;
   border-radius: 50%;
-  border: 1.1vmin solid rgba(255, 255, 255, 0.25);
-  border-top-color: #fff;
-  background: none;
-  animation: now-showing-spin 1s linear infinite;
+  background: conic-gradient(rgba(255, 255, 255, 0), #fff);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.1vmin), #000 calc(100% - 1.1vmin));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.1vmin), #000 calc(100% - 1.1vmin));
+  will-change: transform;
+  animation: now-showing-spin 1.5s linear infinite;
 }
 
 .now-showing.loading .now-showing-pause::after {
@@ -728,10 +730,11 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .now-showing-upnext-song {
-  margin-top: 1vh;
+  margin-top: 0.3vh;
   -webkit-line-clamp: 2;
   /* Split two-line titles evenly ("This Is What / You Came For", not "... Came / For"), and
-     always reserve two lines so the artist lines align across the row. */
+     always reserve two lines so the row (and the centred layout) keeps one height. The song
+     comes after the artist, so a one-line title's spare line sits at the bottom of the tile. */
   text-wrap: balance;
   min-height: 2.3em;
   font-size: clamp(14px, 2.8vw, 48px);
@@ -741,6 +744,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .now-showing-upnext-artist {
+  margin-top: 1vh;
   -webkit-line-clamp: 1;
   font-size: clamp(12px, 2.4vw, 40px);
   font-weight: 500;

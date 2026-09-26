@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, jsonify, request, Response
-import os, json, pathlib, requests, urllib3, subprocess, socket, random, time
+import os, json, pathlib, re, requests, urllib3, subprocess, socket, random, time
 from urllib.parse import quote_plus
 
 import plex_events
@@ -390,6 +390,41 @@ def poster_url(base, token, thumb, verify_tls, w=1200, h=1800):
     )
 
 
+_FEATURING = re.compile(r"\s+(?:ft\.?|feat\.?|featuring)\s.*$", re.IGNORECASE)
+
+
+def short_title(title):
+    """A title without its extras, for the up-next tiles.
+
+    Drops bracketed groups that follow other text ("(from the series ...)", "[Remastered]"),
+    including nested groups and groups right after a dropped one, then anything after "ft.",
+    "feat." or "featuring". A leading group is part of the name ("(Don't Fear) The Reaper")
+    and a group glued to a word ("Baby(One More Time)") is left alone. A title that would
+    trim to nothing is returned whole.
+    """
+    t = (title or '').strip()
+    out, depth, dropping, last_dropped_end = [], 0, False, None
+    for i, ch in enumerate(t):
+        if ch in '([':
+            if depth == 0:
+                follows_space = i > 0 and t[i - 1].isspace()
+                follows_dropped = last_dropped_end is not None and last_dropped_end == i - 1
+                dropping = follows_space or follows_dropped
+            depth += 1
+            if not dropping:
+                out.append(ch)
+        elif ch in ')]' and depth:
+            depth -= 1
+            if not dropping:
+                out.append(ch)
+            elif depth == 0:
+                last_dropped_end = i
+        elif depth == 0 or not dropping:
+            out.append(ch)
+    short = _FEATURING.sub('', ' '.join(''.join(out).split())).strip()
+    return short or t
+
+
 def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
     """The ``count`` items after ``current_item_id`` in Plex play queue ``queue_id`` ("up next").
 
@@ -421,6 +456,7 @@ def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
             "title": title,
             "artist": artist if is_music else '',
             "trackTitle": track if is_music else title,
+            "shortTitle": short_title(track if is_music else title),
             "poster": poster_url(base, token, thumb, verify_tls, 400, 400) if thumb else None,
         })
     return upcoming

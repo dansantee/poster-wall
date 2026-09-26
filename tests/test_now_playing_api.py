@@ -499,6 +499,45 @@ def test_up_next_is_the_items_after_the_current_one(write_cfg, plex, proxy_app):
     assert call.timeout == 3.0, "the monitor thread waits on this lookup"
 
 
+def test_up_next_items_carry_a_short_title(write_cfg, plex, proxy_app):
+    write_cfg(musicVideoSectionId=["8"])
+    plex.route(QUEUES, FakeResponse(queue_items(
+        (1, "Weezer - Buddy Holly"), (2, "Shakira - Hips Don't Lie (featuring Wyclef Jean) ft. Wyclef Jean"))))
+    item = proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")[0]
+    assert item["trackTitle"] == "Hips Don't Lie (featuring Wyclef Jean) ft. Wyclef Jean"
+    assert item["shortTitle"] == "Hips Don't Lie"
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Cups (Pitch Perfect’s When I’m Gone) (Director's Cut)", "Cups"),
+    ("Hips Don't Lie (featuring Wyclef Jean) ft. Wyclef Jean", "Hips Don't Lie"),
+    ("Enemy (from the series Arcane League of Legends)", "Enemy"),
+    ("Lean On (feat. MØ)", "Lean On"),
+    ("Mood ft. iann dior", "Mood"),
+    ("Titanium feat. Sia", "Titanium"),
+    ("Smooth [Remastered]", "Smooth"),
+    # Astra pass 1 #1: adjacent and nested groups go whole
+    ("Cups (Pitch Perfect)(Official Video)", "Cups"),
+    ("Song (Live [HD])", "Song"),
+    ("Hold Me (Something) Tonight", "Hold Me Tonight"),
+    # a leading group is part of the name, even with stray whitespace (Astra pass 1 #2)
+    ("(Don't Fear) The Reaper", "(Don't Fear) The Reaper"),
+    (" (Don't Fear) The Reaper", "(Don't Fear) The Reaper"),
+    # left alone
+    ("Hit Me Baby(One More Time)", "Hit Me Baby(One More Time)"),
+    ("Left Behind", "Left Behind"),
+    ("Daft Punk Is Playing At My House", "Daft Punk Is Playing At My House"),
+    ("Featuring Nobody", "Featuring Nobody"),
+    ("This Is What You Came For", "This Is What You Came For"),
+    # nothing would be left: keep the title
+    ("(Intro)", "(Intro)"),
+    ("", ""),
+    (None, ""),
+])
+def test_short_title(proxy_app, title, expected):
+    assert proxy_app.short_title(title) == expected
+
+
 def test_up_next_is_none_while_the_queue_has_not_caught_up(write_cfg, plex, proxy_app):
     """Plex moves the queue only once the new video starts; the caller retries later."""
     plex.route(QUEUES, FakeResponse(queue_items((100, "A - a"), (101, "B - b"))))
@@ -510,7 +549,7 @@ def test_up_next_titles_outside_music_libraries_are_not_split(write_cfg, plex, p
     plex.route(QUEUES, FakeResponse(queue_items((1, "Severance - S1E1"), (2, "Severance - S1E2"), section=3)))
     items = proxy_app.monitor_queue(BASE, "tok123", True, "5", "1")
     assert items == [{"title": "Severance - S1E2", "artist": "", "trackTitle": "Severance - S1E2",
-                      "poster": items[0]["poster"]}]
+                      "shortTitle": "Severance - S1E2", "poster": items[0]["poster"]}]
 
 
 def test_up_next_at_the_end_of_the_queue_is_empty(write_cfg, plex, proxy_app):

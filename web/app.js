@@ -768,8 +768,12 @@
       list.map(item =>
         `<div class="now-showing-upnext-item">` +
           (item.poster ? `<img src="${escapeHtml(prox(item.poster))}" alt="" />` : '<div class="now-showing-upnext-blank"></div>') +
-          `<div class="now-showing-upnext-song">${escapeHtml(item.trackTitle || item.title)}</div>` +
+          // Artist first: the artists line up under the covers, and a one-line song's spare
+          // (reserved) line falls at the bottom of the tile, where it reads as margin.
           `<div class="now-showing-upnext-artist">${escapeHtml(item.artist)}</div>` +
+          // shortTitle (from the proxy) drops "(...)" and "ft." extras; the full title stays
+          // for when the song is actually playing.
+          `<div class="now-showing-upnext-song">${escapeHtml(item.shortTitle || item.trackTitle || item.title)}</div>` +
         `</div>`).join('') +
       `</div>`;
   }

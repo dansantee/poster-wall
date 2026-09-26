@@ -500,11 +500,34 @@ def test_up_next_titles_wrap_evenly_and_keep_the_row_aligned(source):
     assert "-webkit-line-clamp: 2;" in rule.group(1)
 
 
+def test_up_next_puts_the_artist_above_a_trimmed_song_title(source):
+    """Dan: a one-line title left a gap before its artist that looked unintentional. The
+    artist now comes first, so the spare reserved line falls at the bottom of the tile, and
+    titles drop their "(...)" / "ft." extras."""
+    app_js = source(APP_JS)
+    body = app_js[app_js.index("function renderUpNext"):app_js.index("function holdForNextItem")]
+    assert body.index("now-showing-upnext-artist") < body.index("now-showing-upnext-song")
+    # The trimming itself lives in the proxy (app.short_title, behaviour-tested in
+    # test_now_playing_api.py); the kiosk only displays it.
+    assert "escapeHtml(item.shortTitle || item.trackTitle || item.title)" in body
+
+
+def test_the_loading_spinner_is_a_fading_ring_that_turns_slowly(source):
+    """The wall runs 4K at 30 Hz; a solid arc turning once a second stepped visibly."""
+    css = source(STYLES_CSS)
+    rule = re.search(r"\.now-showing\.loading \.now-showing-pause::before \{([^}]*)\}", css)
+    assert rule
+    body = rule.group(1)
+    assert "conic-gradient(" in body and "mask: radial-gradient(" in body
+    assert "animation: now-showing-spin 1.5s linear infinite;" in body
+    assert "border-top-color" not in body
+
+
 def test_up_next_titles_are_html_escaped(source):
     """Library titles contain &, quotes and apostrophes, and the row is built as HTML."""
     app_js = source(APP_JS)
     body = app_js[app_js.index("function renderUpNext"):app_js.index("function holdForNextItem")]
-    assert "escapeHtml(item.trackTitle || item.title)" in body
+    assert "escapeHtml(item.shortTitle || item.trackTitle || item.title)" in body
     assert "escapeHtml(item.artist)" in body
     assert "escapeHtml(prox(item.poster))" in body
 
