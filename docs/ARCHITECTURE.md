@@ -185,6 +185,15 @@ Two things about `nowplaying` mode are worth knowing:
     runs 1080p60). The cost is that a real Stop
     mid-queue holds this look for up to 8 s.
   - `?state=loading` on a preview URL shows the loading look.
+- The movie/TV layout is one centred column with a single `2.5vw` gap between
+  the marquee, the progress bar, the poster and the icon row. The bar, poster and
+  icons share a `3vw` side margin. The poster has a set width (`94vw`), so a small
+  poster still scales up to the margins. Each icon's box is the drawn icon, so the
+  space around the row is real. The rules are `.now-showing:not(.music)`, so music
+  mode is unaffected.
+  - With the wall at 1080p, `nowShowingFontSize` 10 leaves the marquee on one line
+    with side margins.
+  - A size too large for one line wraps.
 - **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
   `placePauseBadge()` positions it from the art's bounding box, because the art
   sits differently in the movie and music layouts. The wall stays on the

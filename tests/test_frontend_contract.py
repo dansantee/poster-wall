@@ -698,6 +698,28 @@ def test_the_music_stack_leaves_the_art_a_side_sized_top_margin(source):
     assert "padding: 2.5vh 5vw 0;" in upnext
 
 
+def test_the_movie_stack_has_even_gaps_and_shared_side_margins(source):
+    """Dan, 2026-09-28: the movie/TV spacing. Measured in Edge at 1080x1920 before: the title
+    clipped at the top edge, 6 px from bar to poster, icons 56 px tall in a 160 px box."""
+    css = source(STYLES_CSS)
+    rule = lambda sel: re.search(re.escape(sel) + r" \{([^}]*)\}", css).group(1)
+    stack = rule(".now-showing:not(.music)")
+    assert "justify-content: center;" in stack and "gap: 2.5vw;" in stack
+    assert "padding: 3vw 0 3.5vw;" in stack
+    title = rule(".now-showing:not(.music) .now-showing-title")
+    assert "margin: 0;" in title and "line-height: 1;" in title
+    # A big nowShowingFontSize (UI max 20) must wrap, not run off the edges (Astra pass 1 #1).
+    assert "nowrap" not in title
+    # The bar keeps its configurable vertical padding; bar, poster and icons share 3vw sides.
+    assert "margin: var(--progress-bar-padding, 1.5vh) 3vw;" in rule(".now-showing:not(.music) .now-showing-progress")
+    poster = rule(".now-showing:not(.music) .now-showing-poster")
+    # A set width: with only max-width, a poster smaller than the screen stayed at its own size.
+    # (?<!-): "max-width: 94vw;" alone must not satisfy it (Astra pass 1 #2).
+    assert re.search(r"(?<![-\w])width: 94vw;", poster) and "flex: 0 1 auto;" in poster
+    assert "margin: 0 3vw;" in rule(".now-showing:not(.music) .now-showing-info")
+    assert "height: auto;" in rule(".now-showing:not(.music) .now-showing-metadata-icon")
+
+
 def test_music_video_mode_hides_the_marquee(source):
     css = source(STYLES_CSS)
     rule = re.search(r"\.now-showing\.music \.now-showing-title[^{]*\{([^}]*)\}", css)

@@ -534,6 +534,51 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   color: var(--text);
 }
 
+/* Movie/TV spacing (Dan, 2026-09-28: "never been really happy with the spacing"). One gap
+   between title, bar, poster and icons, a 3vw side margin shared by the bar, poster and icons,
+   and the whole stack centred. Measured in Edge at 1080x1920 before: the title's letters clipped
+   at the top edge, 6 px from bar to poster, and each icon drew 56 px tall in a 160 px box. The
+   title stays full width; its size is the nowShowingFontSize setting, and a size too big for
+   one line still wraps rather than being clipped (Astra pass 1 #1). */
+.now-showing:not(.music) {
+  justify-content: center;
+  gap: 2.5vw;
+  padding: 3vw 0 3.5vw;
+}
+
+.now-showing:not(.music) .now-showing-title {
+  margin: 0;
+  line-height: 1;
+  padding-left: 0.1em; /* the letter-spacing trails the last letter; this re-centres the word */
+}
+
+.now-showing:not(.music) .now-showing-progress {
+  width: auto;
+  margin: var(--progress-bar-padding, 1.5vh) 3vw;
+}
+
+.now-showing:not(.music) .now-showing-poster {
+  /* A set width, so a poster smaller than the screen still scales up to the margins; its
+     height follows, and shrinks (letterboxed by object-fit) only if the stack doesn't fit. */
+  flex: 0 1 auto;
+  width: 94vw;
+  max-width: 94vw;
+}
+
+.now-showing:not(.music) .now-showing-info {
+  width: auto;
+  margin: 0 3vw;
+}
+
+.now-showing:not(.music) .now-showing-metadata-icons {
+  max-width: none;
+}
+
+.now-showing:not(.music) .now-showing-metadata-icon {
+  flex: 1 1 0;
+  height: auto; /* the box is the drawn icon, so the gaps around the row are real */
+}
+
 /* Music video mode, after Spotify's now-playing screen: album art on a solid background
    averaged from the art, then song, artist and a slim progress bar, centred as one group.
    The marquee title is hidden. The flex `order` values re-sequence the shared elements
