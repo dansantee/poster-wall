@@ -103,6 +103,8 @@ WEB_DIR="$REPO_DIR/web"
 PROXY_SERVICE="$SYSTEMD_USER_DIR/poster-proxy.service"
 WEB_SERVICE="$SYSTEMD_USER_DIR/poster-web.service"
 KIOSK_SERVICE="$SYSTEMD_USER_DIR/poster-kiosk.service"
+# Chromium's HTTP cache for the default profile (the kiosk runs without --user-data-dir)
+KIOSK_CACHE_DIR="$USER_HOME/.cache/chromium/Default/Cache"
 
 SEATD_SERVICE="seatd.service"
 
@@ -228,8 +230,9 @@ $SWAY_MODE_LINE
 # Hide the pointer immediately (compositor-level)
 seat * hide_cursor 1
 
-# Launch Chromium fullscreen to the local site
-exec $BROWSER_BIN ${CHROMIUM_FLAGS[*]} http://localhost:$WEB_PORT
+# Launch Chromium fullscreen to the local site, with an empty HTTP cache: http.server sends no
+# cache headers, so Chromium would otherwise keep serving a deployed-over styles.css/app.js.
+exec rm -rf '$KIOSK_CACHE_DIR' && $BROWSER_BIN ${CHROMIUM_FLAGS[*]} http://localhost:$WEB_PORT
 EOF
 
 cat >"$KIOSK_SERVICE" <<EOF

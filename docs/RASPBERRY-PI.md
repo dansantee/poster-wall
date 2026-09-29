@@ -29,7 +29,10 @@ Run from the repo root, idempotent, safe to re-run:
    lingering with `loginctl enable-linger` so they start at boot without a
    login, then enables and starts them.
 5. **Writes `~/.config/sway/config`** — rotates `HDMI-A-1`, hides the cursor,
-   and execs Chromium in kiosk mode at `http://localhost:8088`.
+   and execs Chromium in kiosk mode at `http://localhost:8088`. The exec first
+   deletes Chromium's HTTP cache (`~/.cache/chromium/Default/Cache`). `http.server`
+   sends no cache headers, so without that a kiosk restart after a deploy could
+   keep showing the old `styles.css`/`app.js` (seen 2026-09-28).
 6. **Applies boot tweaks** to `/boot/firmware`, backing up each file first:
    `consoleblank=0` (no blanking), `gpu_mem=256`, `hdmi_force_hotplug=1`, and
    exactly one `fbcon=rotate:N` entry.

@@ -61,6 +61,19 @@ def test_the_kiosk_browser_opens_the_static_site(source):
     assert "--ozone-platform=wayland" in setup
 
 
+def test_the_kiosk_starts_with_an_empty_http_cache(source):
+    """2026-09-28: after a deploy and kiosk restart the TV still showed the old styles.css.
+    http.server sends no cache headers, so Chromium reused its cached copy (Cache_Data dated
+    before the deploy). The kiosk clears the cache before launching the browser."""
+    setup = source(SETUP_SH)
+    assert shell_var(setup, "KIOSK_CACHE_DIR") == "$USER_HOME/.cache/chromium/Default/Cache"
+    exec_line = re.search(r"^exec .*http://localhost:\$WEB_PORT$", setup, re.M).group(0)
+    # The clear runs first; rm -rf succeeds even when the directory is missing, so the
+    # browser always starts. The path is quoted: a home with a space must not split into two
+    # rm targets (Astra pass 1 #1).
+    assert exec_line.startswith("exec rm -rf '$KIOSK_CACHE_DIR' && $BROWSER_BIN "), exec_line
+
+
 def test_the_proxy_listens_on_all_interfaces(source):
     """The settings page is opened from another machine on the LAN."""
     assert "host='0.0.0.0'" in source(PROXY_PY)
