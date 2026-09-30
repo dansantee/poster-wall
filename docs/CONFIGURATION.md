@@ -29,7 +29,7 @@ that is what the **Restart Kiosk** button is for.
   "nowShowingText": "NOW SHOWING",
   "musicVideoSectionId": ["8"],
   "nowShowingFont": "'Cinzel', serif",
-  "nowShowingFontSize": 22,
+  "nowShowingFontSize": 11,
   "nowShowingFontWeight": 500,
   "nowShowingKerning": 0.1,
   "nowShowingColor": "#f4e88a",
@@ -89,7 +89,7 @@ Rec. 601 luma over a 32×32 sample is ≥ 200 of 255.
 | --- | --- | --- | --- |
 | `nowShowingText` | string | `"NOW SHOWING"` | The marquee text. This is *all* the text shown — the movie or episode title is not rendered. |
 | `nowShowingFont` | string | `"'Bebas Neue', sans-serif"` | A CSS `font-family` value, chosen from the dropdown. Google Fonts options are preloaded by `index.html`; anything else must be installed on the Pi. |
-| `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. UI range 5–20. |
+| `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. UI range 5–20. The pixel caps mean the same value looks twice as big at 1080p as at 4K (22 was right at 4K; the 1080p wall uses 11). At 1080×1920 with Cinzel, 11 just fits "NOW SHOWING" on one line, 10 leaves side margins, and larger sizes wrap. |
 | `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1. |
 | `nowShowingFontWeight` | number | `700` | 300–900 in steps of 100. Only weights the loaded font actually ships will look different. |
 | `nowShowingColor` | string | `"#F4E88A"` | Marquee text colour, written to the `--now-showing-color` custom property. |

@@ -191,8 +191,8 @@ Two things about `nowplaying` mode are worth knowing:
   poster still scales up to the margins. Each icon's box is the drawn icon, so the
   space around the row is real. The rules are `.now-showing:not(.music)`, so music
   mode is unaffected.
-  - With the wall at 1080p, `nowShowingFontSize` 10 leaves the marquee on one line
-    with side margins.
+  - At 1080p, `nowShowingFontSize` 11 (the wall's setting) just fits the marquee on one
+    line. At 10 it has side margins.
   - A size too large for one line wraps.
 - **Paused** (all media): the art dims to 55% and a pause badge is centred on it.
   `placePauseBadge()` positions it from the art's bounding box, because the art
