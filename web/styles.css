@@ -7,6 +7,9 @@
   --progress-bar-height: 2.5vh; /* Default height value */
   --poster-dim-brightness: 0.5;
   --music-accent: #ffffff; /* app.js sets it on #nowShowing from the album art */
+  /* The letterbox/pillarbox bars around non-square music art: a darker shade of the backdrop,
+     so the square reads as a frame (Dan, 2026-09-30: bars matching the backdrop looked odd). */
+  --music-art-bars: rgba(0, 0, 0, 0.55);
 }
 
 *{box-sizing:border-box}
@@ -698,6 +701,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   margin: 0 auto;
   border-radius: 1.2vw;
   box-shadow: 0 1.5vh 5vh rgba(0, 0, 0, 0.45);
+  background: var(--music-art-bars);
 }
 
 .now-showing.music .now-showing-track {
@@ -742,6 +746,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   position: fixed;
   z-index: 3;
   object-fit: contain; /* the same fit as the main art and the tile, so the shape never jumps */
+  background: var(--music-art-bars);
   border-radius: 1.2vw;
   box-shadow: 0 1.5vh 5vh rgba(0, 0, 0, 0.45);
   transform-origin: top left;
@@ -835,11 +840,12 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.35);
 }
 
-/* A non-square cover sits in its square the way the main art does: whole, with the backdrop
-   showing in the bars (Dan, 2026-09-29: it was cropped square here, then jumped to its real
-   shape when it flew up). */
+/* A non-square cover sits in its square the way the main art does: whole, with the same
+   darker bars (Dan, 2026-09-29: it was cropped square here, then jumped to its real shape when
+   it flew up). */
 .now-showing-upnext-item img {
   object-fit: contain;
+  background: var(--music-art-bars);
 }
 
 .now-showing-upnext-blank {

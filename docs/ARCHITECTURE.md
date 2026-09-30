@@ -204,8 +204,10 @@ Two things about `nowplaying` mode are worth knowing:
   now-playing screen:
   - The marquee and metadata badges are hidden.
   - The art sits in a square frame on a solid background. A non-square cover is
-    drawn whole, with the background showing in the bars. The up-next tiles and the
-    cover flying up on a song change use the same fit, so the shape never jumps. About
+    drawn whole, and its bars are a darker shade of the background
+    (`--music-art-bars`, 55% black over it), so the square still reads as a frame.
+    The up-next tiles and the cover flying up on a song change use the same fit and
+    bars, so the shape never jumps. About
     1 in 9 library covers is non-square: CD scans around 1.15:1, film posters and
     16:9 frames. `computeArtColors()` takes a
     16×16 sample of the art and paints the average colour, darkened to 55%, on

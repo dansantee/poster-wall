@@ -826,17 +826,23 @@ def test_the_music_backdrop_stays_lighter_than_a_dark_edged_cover(source):
 def test_a_non_square_cover_keeps_its_shape_from_tile_to_main_art(source):
     """Dan, 2026-09-29: "Another Night" (1200x1048) was square in up next, then jumped to its
     true shape with bars once playing. The tile, the flying copy and the main art must all fit
-    the cover the same way (contain), with no background of their own in the bars."""
+    the cover the same way (contain), with the same bars.
+
+    Dan, 2026-09-30: bars matching the backdrop looked odd (Prince Ali's poster floated in an
+    empty square), so all three paint the same darker --music-art-bars in them."""
     css = source(STYLES_CSS)
     rule = lambda sel: re.search(re.escape(sel) + r" \{([^}]*)\}", css).group(1)
     assert "object-fit: contain;" in rule(".now-showing-poster")        # the main art (base rule)
     assert "object-fit: contain;" in rule(".now-showing-fly")
     assert "object-fit: contain;" in rule(".now-showing-upnext-item img")
     assert "object-fit: cover" not in css[css.index(".now-showing-upnext-item img"):]
-    for sel in (".now-showing-fly", ".now-showing-upnext-item img",
-                ".now-showing-upnext-item img,\n.now-showing-upnext-blank"):
-        assert "background" not in rule(sel), sel
-    assert "background" not in rule(".now-showing.music .now-showing-poster")
+    root = re.search(r":root\s*\{([^}]*)\}", css).group(1)              # written ":root{"
+    assert "--music-art-bars: rgba(0, 0, 0, 0.55);" in root
+    for sel in (".now-showing.music .now-showing-poster", ".now-showing-fly",
+                ".now-showing-upnext-item img"):
+        assert "background: var(--music-art-bars);" in rule(sel), sel
+    # the shared tile/placeholder rule has no fill of its own (the placeholder keeps its own)
+    assert "background" not in rule(".now-showing-upnext-item img,\n.now-showing-upnext-blank")
     # The empty placeholder (no poster) keeps its faint fill (Astra pass 1 #1, P2).
     # its own rule, not the shared "img,\n.now-showing-upnext-blank {" one
     blank = re.search(r"(?<!,)\n\.now-showing-upnext-blank \{([^}]*)\}", css).group(1)
