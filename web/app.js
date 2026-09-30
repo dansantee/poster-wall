@@ -345,8 +345,8 @@
   // - accent: the most vivid pixels' colour, lifted to a bright, saturated tone that stands out
   //   on the dark backdrop (progress bar, "Up next" label); null for near-greyscale art,
   //   which keeps the white default
-  // A cover whose outer edge is darker than this (HSL lightness, 0-1; ~30/255) gets a backdrop
-  // at least BACKDROP_EDGE_GAP lighter than that edge. Brighter edges keep the plain darkened
+  // A cover whose darkest side is darker than this (HSL lightness, 0-1; ~30/255) gets a
+  // backdrop at least BACKDROP_EDGE_GAP lighter than that side. Brighter edges keep the plain darkened
   // average: without this limit, a red or tan cover's backdrop went pale (caught on a render).
   const BACKDROP_DARK_EDGE = 0.12;
   const BACKDROP_EDGE_GAP = 0.18;
@@ -356,20 +356,20 @@
     const n = data.length / 4, darken = 0.55;
     let r = 0, g = 0, b = 0;
     for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; }
-    // Keep the backdrop a little lighter than the art's outer edge, so a cover with a black
+    // Keep the backdrop a little lighter than the art's darkest side, so a cover with a black
     // border or black design (Billie Jean, Sober) still reads as a full square instead of
-    // melting into a near-black backdrop (Dan, 2026-09-29). Only dark-edged art changes:
-    // about 67 of 499 covers. The backdrop keeps its own hue and saturation.
-    let edgeL = 0, edgeN = 0;
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        if (x > 0 && y > 0 && x < 15 && y < 15) continue;
-        const i = (y * 16 + x) * 4;
-        edgeL += rgbToHsl(data[i], data[i+1], data[i+2]).l;
-        edgeN++;
-      }
+    // melting into a near-black backdrop (Dan, 2026-09-29). The darkest SIDE, not the whole
+    // ring: Levitating's top and right are black but its left and bottom are bright, and a
+    // ring average hid it. The backdrop keeps its own hue and saturation.
+    const lightAt = (x, y) => { const i = (y * 16 + x) * 4; return rgbToHsl(data[i], data[i+1], data[i+2]).l; };
+    const sides = [0, 0, 0, 0];               // top, bottom, left, right
+    for (let k = 0; k < 16; k++) {
+      sides[0] += lightAt(k, 0) / 16;
+      sides[1] += lightAt(k, 15) / 16;
+      sides[2] += lightAt(0, k) / 16;
+      sides[3] += lightAt(15, k) / 16;
     }
-    edgeL /= edgeN;
+    const edgeL = Math.min(...sides);
     const back = rgbToHsl(r / n * darken, g / n * darken, b / n * darken);
     if (edgeL < BACKDROP_DARK_EDGE && back.l < edgeL + BACKDROP_EDGE_GAP) {
       // Lightness rounds UP (to 0.1%), so the gap is never under BACKDROP_EDGE_GAP (Astra pass 1 #1)

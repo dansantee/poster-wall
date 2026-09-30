@@ -735,6 +735,33 @@ def _sample(ring, centre):
     return data
 
 
+def _two_sides_black(bright):
+    """Levitating-like: top and right edges black, the rest of the image `bright`."""
+    data = []
+    for y in range(16):
+        for x in range(16):
+            data += ([0, 0, 0] if y == 0 or x == 15 else list(bright)) + [255]
+    return data
+
+
+def _one_side_dark(side, bright=(90, 90, 90), row=((0, 0, 0), (40, 40, 40))):
+    """Only `side` (top/bottom/left/right) is dark, its pixels alternating through `row`, so
+    the side's mean differs from its darkest pixel (Astra pass 1 #1, P2)."""
+    data = []
+    for y in range(16):
+        for x in range(16):
+            on = {"top": y == 0, "bottom": y == 15, "left": x == 0, "right": x == 15}[side]
+            k = x if side in ("top", "bottom") else y
+            data += list(row[k % len(row)] if on else bright) + [255]
+    return data
+
+
+def _side_means(data):
+    light = lambda x, y: _lightness(*data[(y * 16 + x) * 4:(y * 16 + x) * 4 + 3])
+    return [sum(light(k, 0) for k in range(16)) / 16, sum(light(k, 15) for k in range(16)) / 16,
+            sum(light(0, k) for k in range(16)) / 16, sum(light(15, k) for k in range(16)) / 16]
+
+
 def _lightness(r, g, b):
     return colorsys.rgb_to_hls(r / 255, g / 255, b / 255)[1]
 
@@ -753,11 +780,17 @@ def test_the_music_backdrop_stays_lighter_than_a_dark_edged_cover(source):
         "black_frame_white": _sample((0, 0, 0), (255, 255, 255)),  # dark edge, light middle
         "red": _sample((200, 30, 40), (200, 30, 40)),           # Toto-like: must not change
         "just_above": _sample((32, 32, 32), (32, 32, 32)),      # edge L 0.125 > 0.12: no lift
+        # Levitating (Dan, 2026-09-29): two black sides, the rest a dark grey. The whole-ring
+        # average is ~0.13 (> 0.12, so a ring rule leaves it), but the darkest side is black.
+        "two_black_sides": _two_sides_black((70, 70, 70)),
+        # each side darkest in turn, with a mixed row, so the lift must use that side's MEAN
+        **{f"only_{s}": _one_side_dark(s) for s in ("top", "bottom", "left", "right")},
     }
     script = code + "\nconst cases = " + json.dumps(cases) + ";\n" \
         "const out = {}; for (const k in cases) out[k] = backdropColor(cases[k]);\n" \
         "console.log(JSON.stringify(out));"
-    out = json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True,
+    # On stdin: the script outgrows the Windows command-line limit when passed with -e
+    out = json.loads(subprocess.run(["node"], input=script, capture_output=True, text=True,
                                     check=True).stdout)
     gap = float(re.search(r"const BACKDROP_EDGE_GAP = ([\d.]+);", body).group(1))
 
@@ -770,11 +803,16 @@ def test_the_music_backdrop_stays_lighter_than_a_dark_edged_cover(source):
     def mean(data, k):
         return sum(data[k::4]) / 256
 
-    for name in ("black", "black_frame_purple"):
+    lifted_cases = ("black", "black_frame_purple", "two_black_sides",
+                    "only_top", "only_bottom", "only_left", "only_right")
+    for name in lifted_cases:
         data = cases[name]
-        h, s, l = map(float, re.fullmatch(r"hsl\(([\d.]+), ([\d.]+)%, ([\d.]+)%\)", out[name]).groups())
-        edge = min(_lightness(*cases[name][i:i + 3]) for i in range(0, 64, 4))
+        lifted = re.fullmatch(r"hsl\(([\d.]+), ([\d.]+)%, ([\d.]+)%\)", out[name])
+        assert lifted, (name, "not lifted", out[name])
+        h, s, l = map(float, lifted.groups())
+        edge = min(_side_means(data))                             # the darkest side's mean
         assert l / 100 >= edge + gap, (name, out[name])          # never under the gap
+        assert l / 100 < edge + gap + 0.0011, (name, out[name])  # and no more (0.1% round-up)
         avg = [mean(data, k) * 0.55 for k in range(3)]
         hh, ll, ss = colorsys.rgb_to_hls(*(c / 255 for c in avg))
         assert abs(h - hh * 360) < 0.01 and abs(s - ss * 100) < 0.01, (name, out[name])  # own hue

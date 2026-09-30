@@ -210,13 +210,17 @@ Two things about `nowplaying` mode are worth knowing:
     16:9 frames. `computeArtColors()` takes a
     16×16 sample of the art and paints the average colour, darkened to 55%, on
     `#nowShowingBackdrop` (`backdropColor()`).
-    - When the sample's outer ring is dark (HSL lightness under
-      `BACKDROP_DARK_EDGE`, 0.12), the backdrop is kept at least
-      `BACKDROP_EDGE_GAP` (0.18) lighter than that ring, with its own hue and
-      saturation.
+    - When the sample's darkest side is dark (the mean HSL lightness of its top,
+      bottom, left or right row, under `BACKDROP_DARK_EDGE`, 0.12), the backdrop
+      is kept at least `BACKDROP_EDGE_GAP` (0.18) lighter than that side, with its
+      own hue and saturation.
     - Without that, a cover with a black border or black design (Billie Jean,
-      TOOL's Sober) melted into a near-black backdrop. About 67 of 499 covers
-      have a dark edge, and the rest keep the plain darkened average.
+      TOOL's Sober) melted into a near-black backdrop.
+    - It uses the darkest side rather than the whole ring because of Levitating:
+      its top and right edges are black while its left and bottom are bright. The
+      ring average was just over the limit, so its backdrop stayed rgb(23,21,20).
+    - Covers whose backdrop is already that much lighter keep the plain darkened
+      average.
     - `test_the_music_backdrop_stays_lighter_than_a_dark_edged_cover` runs this
       code in Node when it's installed.
   - It also picks an **accent**: the average of the most vivid pixels
