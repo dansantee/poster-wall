@@ -720,6 +720,26 @@ def test_the_movie_stack_has_even_gaps_and_shared_side_margins(source):
     assert "height: auto;" in rule(".now-showing:not(.music) .now-showing-metadata-icon")
 
 
+def test_a_non_square_cover_keeps_its_shape_from_tile_to_main_art(source):
+    """Dan, 2026-09-29: "Another Night" (1200x1048) was square in up next, then jumped to its
+    true shape with bars once playing. The tile, the flying copy and the main art must all fit
+    the cover the same way (contain), with no background of their own in the bars."""
+    css = source(STYLES_CSS)
+    rule = lambda sel: re.search(re.escape(sel) + r" \{([^}]*)\}", css).group(1)
+    assert "object-fit: contain;" in rule(".now-showing-poster")        # the main art (base rule)
+    assert "object-fit: contain;" in rule(".now-showing-fly")
+    assert "object-fit: contain;" in rule(".now-showing-upnext-item img")
+    assert "object-fit: cover" not in css[css.index(".now-showing-upnext-item img"):]
+    for sel in (".now-showing-fly", ".now-showing-upnext-item img",
+                ".now-showing-upnext-item img,\n.now-showing-upnext-blank"):
+        assert "background" not in rule(sel), sel
+    assert "background" not in rule(".now-showing.music .now-showing-poster")
+    # The empty placeholder (no poster) keeps its faint fill (Astra pass 1 #1, P2).
+    # its own rule, not the shared "img,\n.now-showing-upnext-blank {" one
+    blank = re.search(r"(?<!,)\n\.now-showing-upnext-blank \{([^}]*)\}", css).group(1)
+    assert "background: rgba(255, 255, 255, 0.08);" in blank
+
+
 def test_the_playing_song_shows_the_proxy_display_title(source):
     """Dan, 2026-09-29: hide tags like "(Videoclip)" in the now-playing title. The proxy strips
     them into displayTitle; the kiosk falls back to trackTitle for an older proxy."""

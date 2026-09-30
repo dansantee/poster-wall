@@ -312,7 +312,8 @@ contacts Plex at all.
 **Music video artwork** is the session `thumb`, i.e. the item's Plex poster. An
 "Other Videos" library has no metadata agent, so that poster is a video frame
 unless an `Artist - Title.jpg` sidecar sits next to the video file; Plex then
-uses the sidecar. The kiosk draws the art square over a blurred copy of itself.
+uses the sidecar. The kiosk fits the art whole into a square frame (a non-square cover
+gets bars) on a solid colour taken from the art.
 
 The first session that passes wins. Everything else is ignored.
 

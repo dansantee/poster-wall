@@ -741,7 +741,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing-fly {
   position: fixed;
   z-index: 3;
-  object-fit: cover;
+  object-fit: contain; /* the same fit as the main art and the tile, so the shape never jumps */
   border-radius: 1.2vw;
   box-shadow: 0 1.5vh 5vh rgba(0, 0, 0, 0.45);
   transform-origin: top left;
@@ -831,10 +831,19 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  object-fit: cover;
   border-radius: 0.8vw;
-  background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.35);
+}
+
+/* A non-square cover sits in its square the way the main art does: whole, with the backdrop
+   showing in the bars (Dan, 2026-09-29: it was cropped square here, then jumped to its real
+   shape when it flew up). */
+.now-showing-upnext-item img {
+  object-fit: contain;
+}
+
+.now-showing-upnext-blank {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .now-showing-upnext-song,

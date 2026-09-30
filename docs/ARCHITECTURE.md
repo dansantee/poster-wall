@@ -203,7 +203,11 @@ Two things about `nowplaying` mode are worth knowing:
   `#nowShowing` gets the `music` class, and the layout follows Spotify's
   now-playing screen:
   - The marquee and metadata badges are hidden.
-  - The square art sits on a solid background. `computeArtColors()` takes a
+  - The art sits in a square frame on a solid background. A non-square cover is
+    drawn whole, with the background showing in the bars. The up-next tiles and the
+    cover flying up on a song change use the same fit, so the shape never jumps. About
+    1 in 9 library covers is non-square: CD scans around 1.15:1, film posters and
+    16:9 frames. `computeArtColors()` takes a
     16×16 sample of the art and paints the average colour, darkened to 55%, on
     `#nowShowingBackdrop`.
   - It also picks an **accent**: the average of the most vivid pixels
@@ -221,7 +225,7 @@ Two things about `nowplaying` mode are worth knowing:
     starts loading once music text is on screen. Wrapping to a second line used to push the rest of the layout
     down.
   - Below that, **"Up next"** (label in the accent colour): up to three
-    upcoming items from `upNext` as square covers with song and artist, drawn
+    upcoming items from `upNext` as covers in square tiles with song and artist, drawn
     by `renderUpNext()`, which HTML-escapes every title.
     - Each tile shows the **artist above the song**. The song is the item's
       `shortTitle` from the proxy (`short_title()` in `app.py`), which drops the
