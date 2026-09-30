@@ -345,6 +345,40 @@
   // - accent: the most vivid pixels' colour, lifted to a bright, saturated tone that stands out
   //   on the dark backdrop (progress bar, "Up next" label); null for near-greyscale art,
   //   which keeps the white default
+  // A cover whose outer edge is darker than this (HSL lightness, 0-1; ~30/255) gets a backdrop
+  // at least BACKDROP_EDGE_GAP lighter than that edge. Brighter edges keep the plain darkened
+  // average: without this limit, a red or tan cover's backdrop went pale (caught on a render).
+  const BACKDROP_DARK_EDGE = 0.12;
+  const BACKDROP_EDGE_GAP = 0.18;
+
+  // The backdrop colour for a 16x16 RGBA sample (a pure function, so the tests can run it).
+  function backdropColor(data) {
+    const n = data.length / 4, darken = 0.55;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; }
+    // Keep the backdrop a little lighter than the art's outer edge, so a cover with a black
+    // border or black design (Billie Jean, Sober) still reads as a full square instead of
+    // melting into a near-black backdrop (Dan, 2026-09-29). Only dark-edged art changes:
+    // about 67 of 499 covers. The backdrop keeps its own hue and saturation.
+    let edgeL = 0, edgeN = 0;
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        if (x > 0 && y > 0 && x < 15 && y < 15) continue;
+        const i = (y * 16 + x) * 4;
+        edgeL += rgbToHsl(data[i], data[i+1], data[i+2]).l;
+        edgeN++;
+      }
+    }
+    edgeL /= edgeN;
+    const back = rgbToHsl(r / n * darken, g / n * darken, b / n * darken);
+    if (edgeL < BACKDROP_DARK_EDGE && back.l < edgeL + BACKDROP_EDGE_GAP) {
+      // Lightness rounds UP (to 0.1%), so the gap is never under BACKDROP_EDGE_GAP (Astra pass 1 #1)
+      const l = Math.min(100, Math.ceil((edgeL + BACKDROP_EDGE_GAP) * 1000) / 10);
+      return `hsl(${back.h.toFixed(2)}, ${(back.s * 100).toFixed(2)}%, ${l}%)`;
+    }
+    return `rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`;
+  }
+
   function computeArtColors(src) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -355,16 +389,13 @@
         const ctx = c.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, 16, 16);
         const { data } = ctx.getImageData(0, 0, 16, 16);
-        let r = 0, g = 0, b = 0;
         const pixels = [];
         for (let i = 0; i < data.length; i += 4) {
-          r += data[i]; g += data[i+1]; b += data[i+2];
           const hsl = rgbToHsl(data[i], data[i+1], data[i+2]);
           // Vivid = saturated and neither near-black nor near-white
           pixels.push({ rgb: [data[i], data[i+1], data[i+2]], score: hsl.s * (1 - Math.abs(hsl.l - 0.5) * 2) });
         }
-        const n = data.length / 4, darken = 0.55;
-        const backdrop = `rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`;
+        const backdrop = backdropColor(data);
 
         const top = Math.max(...pixels.map(p => p.score));
         let accent = null;

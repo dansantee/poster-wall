@@ -5,10 +5,15 @@ each other only through string keys: element ids, CSS class names, CSS custom
 properties, icon filenames and config keys. Those joins are exactly what breaks
 silently during a rename, so they are asserted here from the source text.
 
-None of these tests run JavaScript. They check that the names on both sides of
-each join still line up.
+These tests check that the names on both sides of each join still line up. One
+exception runs JavaScript: the music backdrop colour test executes app.js's own
+colour functions in Node, and skips itself when Node isn't installed.
 """
+import colorsys
+import json
 import re
+import shutil
+import subprocess
 
 import pytest
 
@@ -718,6 +723,66 @@ def test_the_movie_stack_has_even_gaps_and_shared_side_margins(source):
     assert re.search(r"(?<![-\w])width: 94vw;", poster) and "flex: 0 1 auto;" in poster
     assert "margin: 0 3vw;" in rule(".now-showing:not(.music) .now-showing-info")
     assert "height: auto;" in rule(".now-showing:not(.music) .now-showing-metadata-icon")
+
+
+def _sample(ring, centre):
+    """A 16x16 RGBA sample: `ring` on the outer pixels, `centre` inside."""
+    data = []
+    for y in range(16):
+        for x in range(16):
+            edge = x in (0, 15) or y in (0, 15)
+            data += list(ring if edge else centre) + [255]
+    return data
+
+
+def _lightness(r, g, b):
+    return colorsys.rgb_to_hls(r / 255, g / 255, b / 255)[1]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js to run app.js's colour code")
+def test_the_music_backdrop_stays_lighter_than_a_dark_edged_cover(source):
+    """Dan, 2026-09-29: covers with a black border or black design (Billie Jean) melted into a
+    near-black backdrop and looked puny. The backdrop keeps a lightness gap of at least
+    BACKDROP_EDGE_GAP above the art's outer ring; covers without a dark edge keep the plain
+    darkened average. Runs app.js's own rgbToHsl/backdropColor in Node (Astra pass 1 #2)."""
+    body = source(APP_JS)
+    code = body[body.index("function rgbToHsl"):body.index("function computeArtColors")]
+    cases = {
+        "black": _sample((1, 1, 1), (1, 1, 1)),                # uniform near-black (Astra's case)
+        "black_frame_purple": _sample((0, 0, 0), (40, 5, 35)),  # Sober-like
+        "black_frame_white": _sample((0, 0, 0), (255, 255, 255)),  # dark edge, light middle
+        "red": _sample((200, 30, 40), (200, 30, 40)),           # Toto-like: must not change
+        "just_above": _sample((32, 32, 32), (32, 32, 32)),      # edge L 0.125 > 0.12: no lift
+    }
+    script = code + "\nconst cases = " + json.dumps(cases) + ";\n" \
+        "const out = {}; for (const k in cases) out[k] = backdropColor(cases[k]);\n" \
+        "console.log(JSON.stringify(out));"
+    out = json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True,
+                                    check=True).stdout)
+    gap = float(re.search(r"const BACKDROP_EDGE_GAP = ([\d.]+);", body).group(1))
+
+    def js_round(x):   # JavaScript's Math.round: halves go up (Python's round() goes to even)
+        return int(x + 0.5)
+
+    def darkened(rgb_px):
+        return tuple(js_round(c * 0.55) for c in rgb_px)
+
+    def mean(data, k):
+        return sum(data[k::4]) / 256
+
+    for name in ("black", "black_frame_purple"):
+        data = cases[name]
+        h, s, l = map(float, re.fullmatch(r"hsl\(([\d.]+), ([\d.]+)%, ([\d.]+)%\)", out[name]).groups())
+        edge = min(_lightness(*cases[name][i:i + 3]) for i in range(0, 64, 4))
+        assert l / 100 >= edge + gap, (name, out[name])          # never under the gap
+        avg = [mean(data, k) * 0.55 for k in range(3)]
+        hh, ll, ss = colorsys.rgb_to_hls(*(c / 255 for c in avg))
+        assert abs(h - hh * 360) < 0.01 and abs(s - ss * 100) < 0.01, (name, out[name])  # own hue
+    # no dark edge, or an already-light backdrop: exactly the darkened average
+    assert out["red"] == "rgb(%d, %d, %d)" % darkened((200, 30, 40))
+    assert out["just_above"] == "rgb(%d, %d, %d)" % darkened((32, 32, 32))
+    avg = [js_round(mean(cases["black_frame_white"], k) * 0.55) for k in range(3)]
+    assert out["black_frame_white"] == "rgb(%d, %d, %d)" % tuple(avg)
 
 
 def test_a_non_square_cover_keeps_its_shape_from_tile_to_main_art(source):
