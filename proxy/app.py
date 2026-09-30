@@ -425,6 +425,52 @@ def short_title(title):
     return short or t
 
 
+# A bracketed group after the title is a tag, not part of the song's name, when it opens with a
+# credit or source word or a year, or names a video/version/edit. Dan, 2026-09-29: hide
+# "(Videoclip)" in the now-playing title but keep "Undone (The Sweater Song)".
+_TAG_GROUP = re.compile(
+    r"^(?:feat\.?|ft\.?|featuring|with|from|starring|\d{4})\b"
+    r"|\b(?:video|videoclip|version|cut|audio|season|parts?|remaster(?:ed)?)\b",
+    re.IGNORECASE)
+_REMIX = re.compile(r"\bremix\b", re.IGNORECASE)   # a remix sounds different: always kept
+
+
+def display_title(title):
+    """The now-playing title without tag groups ("(Videoclip)", "(feat. Khalid)",
+    "(from Aladdin)", "(Director's Cut)", "(1987)").
+
+    Only top-level groups that follow a space or another group are candidates, so a leading
+    group ("(Don't Fear) The Reaper") and a glued one ("Baby(One More Time)") stay whole,
+    nested groups included. Groups that are part of the name stay ("(What Does The Fox
+    Say)"), and so do remixes. A title that would trim to nothing is returned whole. Known
+    limit: a name part opening with a tag word ("(With or Without You)") is dropped too.
+    """
+    t = (title or '').strip()
+    out, i = [], 0
+    while i < len(t):
+        ch = t[i]
+        if ch not in '([':
+            out.append(ch)
+            i += 1
+            continue
+        depth, j = 0, i                     # find the matching close of this top-level group
+        while j < len(t):
+            depth += t[j] in '(['
+            depth -= t[j] in ')]'
+            if depth == 0:
+                break
+            j += 1
+        group = t[i:j + 1]
+        content = group[1:-1].strip()
+        after_gap = i > 0 and (t[i - 1].isspace() or t[i - 1] in ')]')
+        if after_gap and depth == 0 and _TAG_GROUP.search(content) and not _REMIX.search(content):
+            pass                            # a tag: drop it
+        else:
+            out.append(group)
+        i = j + 1
+    return ' '.join(''.join(out).split()) or t
+
+
 def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
     """The ``count`` items after ``current_item_id`` in Plex play queue ``queue_id`` ("up next").
 
@@ -701,7 +747,8 @@ def now_playing_body(srv, base, token, verify_tls):
                 "mediaType": media_type,
                 "ratingKey": rating_key,
                 "artist": artist,
-                "trackTitle": track_title
+                "trackTitle": track_title,
+                "displayTitle": display_title(track_title)
             }
             if is_music_video:
                 body["facts"] = music_video_facts(base, token, verify_tls, session)

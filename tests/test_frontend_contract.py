@@ -720,6 +720,13 @@ def test_the_movie_stack_has_even_gaps_and_shared_side_margins(source):
     assert "height: auto;" in rule(".now-showing:not(.music) .now-showing-metadata-icon")
 
 
+def test_the_playing_song_shows_the_proxy_display_title(source):
+    """Dan, 2026-09-29: hide tags like "(Videoclip)" in the now-playing title. The proxy strips
+    them into displayTitle; the kiosk falls back to trackTitle for an older proxy."""
+    assert ("isMusicVideo ? (data.displayTitle || data.trackTitle || data.title || '')"
+            in source(APP_JS))
+
+
 def test_music_video_mode_hides_the_marquee(source):
     css = source(STYLES_CSS)
     rule = re.search(r"\.now-showing\.music \.now-showing-title[^{]*\{([^}]*)\}", css)

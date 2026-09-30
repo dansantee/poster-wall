@@ -641,7 +641,7 @@
       poster.src = prox(data.poster);
     }
     setScrollingText(artistEl, isMusicVideo ? (data.artist || '') : '');
-    setScrollingText(songEl, isMusicVideo ? (data.trackTitle || data.title || '') : '');
+    setScrollingText(songEl, isMusicVideo ? (data.displayTitle || data.trackTitle || data.title || '') : '');
     if (backdrop && isMusicVideo && data.poster) {
       const colorsFor = nowPlayingKey(data);
       computeArtColors(prox(data.poster)).then(colors => {

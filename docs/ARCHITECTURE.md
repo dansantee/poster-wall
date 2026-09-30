@@ -233,7 +233,10 @@ Two things about `nowplaying` mode are worth knowing:
 
       A leading group, as in "(Don't Fear) The Reaper", stays, and so does a
       group glued to a word ("Baby(One More Time)"). A title that would trim to
-      nothing is kept whole. The playing song still shows its full title.
+      nothing is kept whole. The playing song shows `displayTitle`, a lighter trim.
+      It drops only tag groups such as "(Videoclip)", "(feat. …)", "(from Aladdin)" and
+      "(Director's Cut)". Name parts such as "(The Sweater Song)" and remixes stay. The
+      rules are in API.md.
       About 1 in 5 library titles gets shortened.
     - Up-next song titles stay still (three more scrolling lines would be too
       much motion). They get up to two lines with an ellipsis, balanced

@@ -669,6 +669,69 @@ def test_short_title(proxy_app, title, expected):
     assert proxy_app.short_title(title) == expected
 
 
+@pytest.mark.parametrize("title,expected", [
+    # Dan, 2026-09-29: "hiding the stuff in parenthesis ... 'Another Night (Videoclip)'"
+    ("Another Night (Videoclip)", "Another Night"),
+    ("Lean On (feat. MØ)", "Lean On"),
+    ("Hips Don't Lie (featuring Wyclef Jean) ft. Wyclef Jean", "Hips Don't Lie ft. Wyclef Jean"),
+    ("Stay (with R3HAB)", "Stay"),
+    ("Prince Ali (From Aladdin)", "Prince Ali"),
+    ("Enemy (from the series Arcane League of Legends)", "Enemy"),
+    ("Africa (starring Weird Al Yankovic)", "Africa"),
+    ("Take On Me (1987)", "Take On Me"),
+    ("Bohemian Rhapsody (2013 Tony Awards Opening)", "Bohemian Rhapsody"),
+    ("Here It Goes Again (Director's Cut)", "Here It Goes Again"),
+    ("Sandstorm (Relaid Audio)", "Sandstorm"),
+    ("Lump (Version A)", "Lump"),
+    ("Blue (US Version)", "Blue"),
+    ("Iron Man (Iron Man 2 Version)", "Iron Man"),
+    ("Daddy Cop & Cop Cuties (Parts 1 and 2)", "Daddy Cop & Cop Cuties"),
+    ("Toss A Coin (Season 2)", "Toss A Coin"),
+    ("Cups (Official Video)", "Cups"),
+    ("Smooth [Remastered]", "Smooth"),
+    # part of the song's name: kept
+    ("Undone (The Sweater Song)", "Undone (The Sweater Song)"),
+    ("The Fox (What Does The Fox Say)", "The Fox (What Does The Fox Say)"),
+    ("Pretty Fly (For A White Guy)", "Pretty Fly (For A White Guy)"),
+    ("Don't You (Forget About Me)", "Don't You (Forget About Me)"),
+    ("Everybody (Backstreet's Back)", "Everybody (Backstreet's Back)"),
+    ("Sweet Dreams (Are Made Of This)", "Sweet Dreams (Are Made Of This)"),
+    ("Cups (Pitch Perfect’s When I’m Gone)", "Cups (Pitch Perfect’s When I’m Gone)"),
+    # remixes sound different, so they stay
+    ("Hymn for the Weekend (Seeb Remix)", "Hymn for the Weekend (Seeb Remix)"),
+    # a leading or glued group is part of the name, even with a tag word (Astra pass 1 #1)
+    ("(Don't Fear) The Reaper", "(Don't Fear) The Reaper"),
+    ("Hit Me Baby(One More Time)", "Hit Me Baby(One More Time)"),
+    ("Song(Videoclip)", "Song(Videoclip)"),
+    ("Baby(With You)", "Baby(With You)"),
+    # a group right after a dropped or kept group is still a candidate
+    ("Cups (Pitch Perfect)(Official Video)", "Cups (Pitch Perfect)"),
+    # a remix stays even if it also holds a tag word (Astra pass 1 #2)
+    ("Song (Video Games Remix)", "Song (Video Games Remix)"),
+    # a leading group stays whole, inner groups included (Astra pass 1 #3)
+    ("(Video (Official Video)) The Song", "(Video (Official Video)) The Song"),
+    # a trailing tag group with a nested group goes whole
+    ("Song (Live [Official Video])", "Song"),
+    # an unclosed bracket is left as it is
+    ("Song (Videoclip", "Song (Videoclip"),
+    # both kinds in one title
+    ("The Fox (What Does The Fox Say) (Official Video)", "The Fox (What Does The Fox Say)"),
+    # nothing would be left: keep the title
+    ("(Videoclip)", "(Videoclip)"),
+    ("", ""),
+    (None, ""),
+])
+def test_display_title(proxy_app, title, expected):
+    assert proxy_app.display_title(title) == expected
+
+
+def test_now_playing_carries_a_display_title_without_tag_groups(client, music_monitored):
+    body = playing(client, music_monitored,
+                   session(template=MUSIC_VIDEO_SESSION, title="Alice Deejay - Another Night (Videoclip)"))
+    assert body["trackTitle"] == "Another Night (Videoclip)"   # the raw split is unchanged
+    assert body["displayTitle"] == "Another Night"
+
+
 def test_up_next_is_none_while_the_queue_has_not_caught_up(write_cfg, plex, proxy_app):
     """Plex moves the queue only once the new video starts; the caller retries later."""
     plex.route(QUEUES, FakeResponse(queue_items((100, "A - a"), (101, "B - b"))))
