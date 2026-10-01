@@ -815,25 +815,27 @@ def test_the_music_stack_leaves_the_art_a_side_sized_top_margin(source):
     assert "padding: 2.5vh 5vw 0;" in upnext
 
 
-def test_the_movie_stack_has_even_gaps_and_shared_side_margins(source):
+def test_the_movie_stack_has_even_gaps_and_runs_edge_to_edge(source):
     """Dan, 2026-09-28: the movie/TV spacing. Measured in Edge at 1080x1920 before: the title
-    clipped at the top edge, 6 px from bar to poster, icons 56 px tall in a 160 px box."""
+    clipped at the top edge, 6 px from bar to poster, icons 56 px tall in a 160 px box.
+    Dan, 2026-09-30: edge to edge. With 3vw margins and 2.5vw gaps a 2:3 poster was
+    height-bound and drew 32 px of black down each side; it needs 1620 px at 1080 wide."""
     css = source(STYLES_CSS)
     rule = lambda sel: re.search(re.escape(sel) + r" \{([^}]*)\}", css).group(1)
     stack = rule(".now-showing:not(.music)")
-    assert "justify-content: center;" in stack and "gap: 2.5vw;" in stack
-    assert "padding: 3vw 0 3.5vw;" in stack
+    assert "justify-content: center;" in stack and "gap: 1.5vw;" in stack
+    assert "padding: 1.5vw 0 0;" in stack
     title = rule(".now-showing:not(.music) .now-showing-title")
     assert "margin: 0;" in title and "line-height: 1;" in title
     # A big nowShowingFontSize (UI max 20) must wrap, not run off the edges (Astra pass 1 #1).
     assert "nowrap" not in title
-    # The bar keeps its configurable vertical padding; bar, poster and icons share 3vw sides.
-    assert "margin: var(--progress-bar-padding, 1.5vh) 3vw;" in rule(".now-showing:not(.music) .now-showing-progress")
+    # The bar keeps its configurable vertical padding; bar, poster and badges have no side margin.
+    assert "margin: var(--progress-bar-padding, 1.5vh) 0;" in rule(".now-showing:not(.music) .now-showing-progress")
     poster = rule(".now-showing:not(.music) .now-showing-poster")
     # A set width: with only max-width, a poster smaller than the screen stayed at its own size.
-    # (?<!-): "max-width: 94vw;" alone must not satisfy it (Astra pass 1 #2).
-    assert re.search(r"(?<![-\w])width: 94vw;", poster) and "flex: 0 1 auto;" in poster
-    assert "margin: 0 3vw;" in rule(".now-showing:not(.music) .now-showing-info")
+    # (?<!-): "max-width: 100vw;" alone must not satisfy it (Astra pass 1 #2).
+    assert re.search(r"(?<![-\w])width: 100vw;", poster) and "flex: 0 1 auto;" in poster
+    assert "margin: 0;" in rule(".now-showing:not(.music) .now-showing-info")
     assert "height: auto;" in rule(".now-showing:not(.music) .now-showing-metadata-icon")
 
 

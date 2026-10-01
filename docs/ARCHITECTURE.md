@@ -188,10 +188,14 @@ Two things about `nowplaying` mode are worth knowing:
     runs 1080p60). The cost is that a real Stop
     mid-queue holds this look for up to 8 s.
   - `?state=loading` on a preview URL shows the loading look.
-- The movie/TV layout is one centred column with a single `2.5vw` gap between
-  the marquee, the progress bar, the poster and the icon row. The bar, poster and
-  icons share a `3vw` side margin. The poster has a set width (`94vw`), so a small
-  poster still scales up to the margins. Each badge's box is the drawn badge, so the
+- The movie/TV layout is one centred column with a single `1.5vw` gap between
+  the marquee, the progress bar, the poster and the badge row. The bar, poster and
+  badges run edge to edge (Dan, 2026-09-30). A 2:3 poster is 1620 px tall at 1080
+  wide, so the gaps are kept tight enough to leave it that height; with the old
+  `3vw` margins and `2.5vw` gaps it was height-bound and drew 32 px of black down
+  each side. The poster has a set width (`100vw`), so a small poster still scales
+  up to the edges. A taller poster, or a large `progressBarPadding`, makes it
+  height-bound again, with thin black bars at the sides. Each badge's box is the drawn badge, so the
   space around the row is real. The rules are `.now-showing:not(.music)`, so music
   mode is unaffected.
 - The row's three badges (resolution, audio, rating) are drawn, not loaded:
