@@ -364,6 +364,15 @@ def test_every_font_face_file_is_in_the_repo(source, repo_root):
     assert (repo_root / "web/fonts/LeagueSpartan-OFL.txt").is_file(), "ship the font's licence with it"
 
 
+def test_the_default_marquee_font_is_served_from_the_pi(source):
+    """Bebas Neue, the default and the wall's marquee font, comes from web/fonts, not Google
+    Fonts (Dan, 2026-09-30: no Google services; it also renders with the internet down)."""
+    css = source(STYLES_CSS)
+    assert re.search(r"@font-face \{\s*font-family: 'Bebas Neue';\s*src: url\('fonts/BebasNeue-Regular.woff2'\)", css)
+    for page in (INDEX_HTML, SETTINGS_HTML):
+        assert "Bebas+Neue" not in source(page), page + " still asks Google Fonts for Bebas Neue"
+
+
 def test_badges_keep_the_shape_of_the_icons_they_replaced(source):
     """The movie layout sizes the row from each badge's own box (height: auto), so the badge
     must carry the old 1408x238 aspect ratio and override the base icon height."""
@@ -387,14 +396,16 @@ def test_every_specially_styled_font_is_offered_in_the_dropdown(source):
 
 
 def test_google_fonts_used_by_the_dropdown_are_preloaded(source):
-    """A font offered but not linked would silently fall back to a system face."""
+    """A font offered but not linked would silently fall back to a system face. A family is
+    either linked from Google Fonts or self-hosted with an @font-face in styles.css."""
     settings_html = source(SETTINGS_HTML)
     index_html = source(INDEX_HTML)
     google_link = re.search(r"fonts\.googleapis\.com/css2\?([^\"']+)", index_html)
     assert google_link, "index.html must link the Google Fonts stylesheet"
     linked = google_link.group(1).lower()
+    hosted = {f.lower() for f in re.findall(r"@font-face\s*\{\s*font-family: '([^']+)'", source(STYLES_CSS))}
     for family in ("anton", "bebas+neue", "cinzel", "oswald", "playfair+display", "raleway", "libre+baskerville"):
-        assert family in linked, family + " is missing from the kiosk font link"
+        assert family in linked or family.replace("+", " ") in hosted, family + " is neither linked nor hosted"
         assert family.replace("+", " ") in settings_html.lower()
 
 
@@ -826,7 +837,13 @@ def test_the_movie_stack_has_even_gaps_and_runs_edge_to_edge(source):
     assert "justify-content: center;" in stack and "gap: 1.5vw;" in stack
     assert "padding: 1.5vw 0 0;" in stack
     title = rule(".now-showing:not(.music) .now-showing-title")
-    assert "margin: 0;" in title and "line-height: 1;" in title
+    # Dan, 2026-09-30: a line box of 1 left a black band above and below the capitals
+    assert "margin: 0;" in title and "line-height: 0.8;" in title
+    # The trailing letter-spacing is matched by an indent of the same width, so the word stays
+    # centred at any kerning, negative included (padding can't go negative: Astra pass 1 #1).
+    assert "text-indent: var(--now-showing-kerning, 0.1em);" in title
+    assert "padding-left" not in title
+    assert "titleEl.style.setProperty('--now-showing-kerning', `${kerning}em`)" in source(APP_JS)
     # A big nowShowingFontSize (UI max 20) must wrap, not run off the edges (Astra pass 1 #1).
     assert "nowrap" not in title
     # The bar keeps its configurable vertical padding; bar, poster and badges have no side margin.

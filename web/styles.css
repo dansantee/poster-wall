@@ -10,6 +10,7 @@
   /* The letterbox/pillarbox bars around non-square music art: a darker shade of the backdrop,
      so the square reads as a frame (Dan, 2026-09-30: bars matching the backdrop looked odd). */
   --music-art-bars: rgba(0, 0, 0, 0.55);
+  --now-showing-kerning: 0.1em; /* app.js sets it from nowShowingKerning; re-centres the title */
 }
 
 *{box-sizing:border-box}
@@ -520,6 +521,14 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 /* Generated metadata badges (app.js badgeHtml), drawn at the 1408x238 proportions of the
    PNG icons they replaced. Sizes are in cqw, hundredths of the badge's width, so a badge
    scales as one piece. A label's --chars (its length) shrinks it to fit its box. */
+/* The default marquee font, served from the Pi rather than Google Fonts (Dan, 2026-09-30) */
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('fonts/BebasNeue-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;
+}
+
 @font-face {
   font-family: 'League Spartan';
   src: url('fonts/LeagueSpartan-Bold.woff2') format('woff2');
@@ -677,8 +686,13 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing:not(.music) .now-showing-title {
   margin: 0;
-  line-height: 1;
-  padding-left: 0.1em; /* the letter-spacing trails the last letter; this re-centres the word */
+  /* Capitals fill about 0.7em, so a line box of 1 left a black band above and below the
+     word; 0.8 gives that height to the poster (Dan, 2026-09-30, Bebas Neue at 19) */
+  line-height: 0.8;
+  /* The letter-spacing trails the last letter; an indent of the same width re-centres the word.
+     text-indent, unlike padding, also takes a negative kerning (Astra pass 1 #1). app.js sets
+     --now-showing-kerning from the nowShowingKerning setting. */
+  text-indent: var(--now-showing-kerning, 0.1em);
 }
 
 .now-showing:not(.music) .now-showing-progress {

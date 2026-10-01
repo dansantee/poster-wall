@@ -263,6 +263,7 @@
       // Apply kerning (letter-spacing) from settings
       const kerning = cfg.nowShowingKerning ?? 0.1;
       titleEl.style.letterSpacing = `${kerning}em`;
+      titleEl.style.setProperty('--now-showing-kerning', `${kerning}em`); // re-centres it (styles.css)
       
       // Apply font weight from settings
       const fontWeight = cfg.nowShowingFontWeight ?? 700;

@@ -428,7 +428,7 @@ web/app.js           kiosk logic: config, paging, rotation, transitions, dimming
 web/settings.html    settings form
 web/settings.js      loads/saves config, build status, test + preview buttons
 web/styles.css       everything visual, including all transition keyframes
-web/fonts/          League Spartan (OFL) for the metadata badges
+web/fonts/          League Spartan (OFL) for the badges; Bebas Neue (OFL), the marquee default
 setup.sh             one-shot Pi provisioning; safe to re-run
 scripts/…-remote.ps1 Windows-side deploy/restart helper over SSH
 docs/                this documentation
