@@ -1068,7 +1068,10 @@
       duration: Number(data.duration) || 0,
       progress: Number(data.progress) || 0
     };
-    queueHasMore = Array.isArray(data.upNext) && data.upNext.length > 0;
+    // Music videos only: a TV play queue (the show's next episodes) made backing out of an
+    // episode hold the loading look for 8 s (Dan, 2026-09-30). The cost: an auto-played next
+    // episode that takes 3-8 s to start (a short post-play countdown) shows posters between.
+    queueHasMore = data.mediaType === 'musicvideo' && Array.isArray(data.upNext) && data.upNext.length > 0;
     renderUpNext(data.upNext);
     const nowShowing = document.getElementById('nowShowing');
     if (nowShowing) {

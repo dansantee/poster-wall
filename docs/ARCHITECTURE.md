@@ -175,9 +175,12 @@ Two things about `nowplaying` mode are worth knowing:
   appears. Usually the gap is 0.1–0.5 s, but a slow-loading next item leaves **no
   session for up to ~4.2 s**, which is indistinguishable from a real Stop while it
   is happening (measured 2026-09-26; the queue doesn't move early either). So:
-  - **Nothing more queued** (`upNext` empty): back to rotation after 3 s
-    (`STOP_GRACE_MS`).
-  - **More queued:** wait up to 8 s (`QUEUE_GRACE_MS`), with the "loading" look
+  - **Nothing more queued** (`upNext` empty), or a movie or episode: back to
+    rotation after 3 s (`STOP_GRACE_MS`). An episode's queue is the show's next
+    episodes, so the hold made backing out of a show sit on the loading look for 8 s
+    (Dan, 2026-09-30). The cost: when the next episode auto-plays 3–8 s later (Plex's
+    5-second post-play countdown, say), posters show in between.
+  - **More music videos queued:** wait up to 8 s (`QUEUE_GRACE_MS`), with the "loading" look
     after 1 s (`LOADING_LOOK_AFTER_MS`, so normal gaps never show it): the art
     dims and the pause badge becomes a spinner: a ring that fades around its
     length, turning every 1.5 s. It was designed when the wall ran 4K at

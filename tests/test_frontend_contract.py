@@ -577,7 +577,10 @@ def test_a_session_gap_holds_longer_when_more_is_queued(source):
     assert "const QUEUE_GRACE_MS = 8000;" in app_js
     assert "const LOADING_LOOK_AFTER_MS = 1000;" in app_js
     assert "gone >= (queueHasMore ? QUEUE_GRACE_MS : STOP_GRACE_MS)" in app_js
-    assert "queueHasMore = Array.isArray(data.upNext) && data.upNext.length > 0;" in app_js
+    # Music videos only (Dan, 2026-09-30): an episode's queue holds the show's next episodes,
+    # so backing out of a show sat on the loading look for 8 s instead of going to posters.
+    assert ("queueHasMore = data.mediaType === 'musicvideo' && Array.isArray(data.upNext) "
+            "&& data.upNext.length > 0;") in app_js
     css = source(STYLES_CSS)
     assert ".now-showing.loading .now-showing-pause::before" in css
     assert "@keyframes now-showing-spin" in css
