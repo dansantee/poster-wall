@@ -54,7 +54,7 @@ parameter:
 | URL | Effect |
 | --- | --- |
 | `index.html?preview=rotation` | Normal rotation, "Now Playing" monitoring disabled |
-| `index.html?preview=nowplaying` | Renders the marquee immediately using a fake session at 42% progress, 4K + 5.1 badges, and the first poster from your library |
+| `index.html?preview=nowplaying` | Renders the marquee immediately using a fake session at 42% progress, 4K Dolby Vision and Atmos badges, and the first poster from your library |
 | `index.html?preview=musicvideo` | The music-video layout with "Weezer" / "Buddy Holly", the first poster from your library (so the art is 2:3, not square, unless the rotation is a music library), and an "Up next" row made from the next three posters |
 
 Either now-playing preview also takes `&state=paused` (the pause dim and badge)
@@ -78,7 +78,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-401 tests, a couple of seconds, no network and no Plex server. They never touch
+433 tests, a couple of seconds, no network and no Plex server. They never touch
 your real `proxy/config.json`. See [TESTING.md](TESTING.md) for what is covered
 and how to add to it.
 

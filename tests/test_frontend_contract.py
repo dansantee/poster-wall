@@ -2,12 +2,12 @@
 
 ``web/`` has no build step and no JS test runner, and its three files talk to
 each other only through string keys: element ids, CSS class names, CSS custom
-properties, icon filenames and config keys. Those joins are exactly what breaks
+properties, font files and config keys. Those joins are exactly what breaks
 silently during a rename, so they are asserted here from the source text.
 
-These tests check that the names on both sides of each join still line up. One
-exception runs JavaScript: the music backdrop colour test executes app.js's own
-colour functions in Node, and skips itself when Node isn't installed.
+These tests check that the names on both sides of each join still line up. Two
+groups run JavaScript: the music backdrop colour test and the metadata badge tests
+execute app.js's own functions in Node, and skip themselves when Node isn't installed.
 """
 import colorsys
 import json
@@ -237,31 +237,140 @@ def test_progress_track_default_matches_the_hex_default(source):
 
 
 # --------------------------------------------------------------------------
-# Metadata icons
+# Metadata badges
 # --------------------------------------------------------------------------
-def test_every_referenced_icon_exists_on_disk(source, repo_root):
-    referenced = set(re.findall(r"info-icons/[A-Za-z0-9._-]+\.png", source(APP_JS)))
-    assert referenced, "app.js should map metadata to icon files"
-    missing = [
-        name for name in sorted(referenced) if not (repo_root / "web" / name).is_file()
-    ]
-    assert missing == [], "app.js references icons that are not in the repo: " + repr(missing)
+def _run_badges(source, calls):
+    """Run app.js's badge functions in Node: calls is [[function name, [args]], ...]; returns
+    each call's result, with badgeHtml's markup for the badge alongside ({badge, html})."""
+    body = source(APP_JS)
+    code = body[body.index("// ---- metadata badges ----"):body.index("function hexToRgb")]
+    code += re.search(r"  function escapeHtml\(s\) \{.*?\n  \}\n", body, re.S).group(0)
+    script = code + "\nconst calls = " + json.dumps(calls) + ";\n" \
+        "const fns = { videoBadge, audioBadge, ratingBadge };\n" \
+        "console.log(JSON.stringify(calls.map(([f, a]) => { const b = fns[f](...a);\n" \
+        "  return b && { badge: b, html: badgeHtml(b) }; })));"
+    return json.loads(subprocess.run(["node"], input=script, capture_output=True, text=True,
+                                     check=True).stdout)
 
 
-def test_unrated_content_has_a_fallback_icon(source, repo_root):
-    assert "info-icons/Rated-NA.png" in source(APP_JS)
-    assert (repo_root / "web/info-icons/Rated-NA.png").is_file()
+def _shown(result):
+    """What a badge reads: its lead (or mark) and its box text, or its rating words."""
+    if result is None:
+        return None
+    b = result["badge"]
+    return (b.get("lead") or b.get("mark"), b.get("text") or b.get("title"), b["color"])
 
 
-def test_icon_maps_cover_what_the_proxy_can_report(source):
-    """/api/now-playing reports Plex's raw values; app.js must map them."""
-    app_js = source(APP_JS)
-    for resolution in ("sd", "720", "1080", "4k"):
-        assert "'" + resolution + "':" in app_js, "no icon for videoResolution " + resolution
-    # The proxy emits "<channels>.0" or "<channels>.1"; 2.0 and 5.1 are the
-    # common cases and must resolve to an icon.
-    assert "'2.0'" in app_js
-    assert "5.1" in app_js
+needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js to run app.js's badge code")
+
+
+@needs_node
+def test_the_video_badge_names_resolution_and_hdr(source):
+    cases = {
+        ("1080", ""): ("HD", "1080", "gold"),
+        ("4k", ""): ("UHD", "4K", "gold"),
+        ("4k", "HDR10"): ("4K", "HDR", "gold"),
+        ("4k", "HDR10+"): ("4K", "HDR10+", "gold"),
+        ("4k", "Dolby Vision"): ("4K", "VISION", "gold"),
+        ("720", ""): ("HD", "720", "gold"),
+        ("480", ""): ("SD", "480", "gold"),      # the PNG set had no 480 badge
+        ("sd", ""): ("SD", "STANDARD", "gold"),
+        ("1080p", "HDR10"): ("1080", "HDR", "gold"),
+        ("", ""): None,
+        ("weird", ""): None,
+    }
+    out = _run_badges(source, [["videoBadge", list(k)] for k in cases])
+    assert [_shown(r) for r in out] == list(cases.values())
+    vision = out[list(cases).index(("4k", "Dolby Vision"))]
+    assert 'class="badge-box-mark"' in vision["html"], "Dolby Vision should carry the Dolby mark"
+
+
+@needs_node
+def test_the_audio_badge_names_what_plex_reports(source):
+    """Dan, 2026-09-30. The PNGs went by channel count alone: Atmos showed "5.1 SURROUND",
+    every 7.1 track had no badge, and a 6.1 DTS track showed "TRUEHD 7.1"."""
+    cases = {
+        ("TRUEHD", "7.1", "dolby truehd + dolby atmos"): ("dolby", "ATMOS"),
+        ("EAC3", "5.1", "dolby digital plus + dolby atmos"): ("dolby", "ATMOS"),
+        ("TRUEHD", "7.1", ""): ("dolby", "TRUEHD 7.1"),
+        ("EAC3", "5.1", ""): ("dolby", "DIGITAL+ 5.1"),
+        ("AC3", "5.1", ""): ("dolby", "DIGITAL 5.1"),
+        ("DCA", "7.1", "ma + dts:x"): ("speaker", "DTS:X 7.1"),
+        ("DCA", "6.1", "ma"): ("speaker", "DTS-HD MA 6.1"),
+        ("DCA", "5.1", "dts"): ("speaker", "DTS 5.1"),
+        ("AAC", "2.0", "lc"): ("speaker", "2.0 STEREO"),
+        ("FLAC", "1.0", ""): ("speaker", "MONO"),
+        ("AAC", "7.1", "lc"): ("speaker", "7.1 SURROUND"),
+        ("OPUS", "", ""): ("speaker", "OPUS"),
+        ("", "", ""): None,
+    }
+    out = _run_badges(source, [["audioBadge", list(k)] for k in cases])
+    assert [_shown(r) and _shown(r)[:2] for r in out] == list(cases.values())
+
+
+@needs_node
+def test_the_rating_badge_covers_every_rating_with_a_fallback(source):
+    cases = {
+        "PG-13": ("PG-13", "PARENTS STRONGLY CAUTIONED", "orange"),
+        "G": ("G", "GENERAL AUDIENCES", "green"),
+        "R": ("R", "RESTRICTED", "red"),
+        "TV-MA": ("TV-MA", "MATURE AUDIENCES ONLY", "red"),
+        "TV-Y7-FV": ("TV-Y7-FV", "DIRECTED TO OLDER CHILDREN", "green"),
+        "TV-Y7 FV": ("TV-Y7-FV", "DIRECTED TO OLDER CHILDREN", "green"),
+        "Not Rated": ("NR", "NOT RATED", "gray"),
+        "Passed": ("PASSED", "APPROVED", "gray"),
+        "": ("N/A", "NOT RATED", "gray"),
+        "N/A": ("N/A", "NOT RATED", "gray"),
+        "gb/15": ("15", "RATED 15", "gray"),     # a country prefix is dropped
+        "18+": ("18+", "RATED 18+", "gray"),
+    }
+    out = _run_badges(source, [["ratingBadge", [k]] for k in cases])
+    assert [_shown(r) for r in out] == list(cases.values())
+
+
+@needs_node
+def test_badge_text_from_plex_is_escaped(source):
+    out = _run_badges(source, [["ratingBadge", ['<img src=x onerror=alert(1)>']]])
+    assert "<img" not in out[0]["html"] and "&lt;IMG" in out[0]["html"]
+
+
+@needs_node
+def test_every_badge_class_is_styled(source):
+    calls = [["videoBadge", ["4k", "Dolby Vision"]], ["videoBadge", ["1080", ""]],
+             ["audioBadge", ["TRUEHD", "7.1", "dolby truehd + dolby atmos"]], ["audioBadge", ["AAC", "2.0", "lc"]],
+             ["ratingBadge", ["PG-13"]], ["ratingBadge", ["G"]], ["ratingBadge", ["R"]], ["ratingBadge", [""]],
+             ["audioBadge", ["DCA", "5.1", "ma"]]]
+    classes = set()
+    for r in _run_badges(source, calls):
+        for attr in re.findall(r'class="([^"]+)"', r["html"]):
+            classes.update(attr.split())
+    css = source(STYLES_CSS)
+    classes.discard("badge-tag")   # the default layout; only badge-rating differs from it
+    unstyled = sorted(c for c in classes if not re.search(r"\." + re.escape(c) + r"(?![\w-])", css))
+    assert unstyled == [], "badge classes with no CSS rule: " + repr(unstyled)
+
+
+def test_badges_need_no_image_files(source, repo_root):
+    """The badges are drawn, not loaded: no PNG icon set to keep in step with the formats."""
+    assert "info-icons" not in source(APP_JS)
+    assert not (repo_root / "web/info-icons").exists()
+
+
+def test_every_font_face_file_is_in_the_repo(source, repo_root):
+    urls = re.findall(r"@font-face\s*\{[^}]*?url\('([^']+)'\)", source(STYLES_CSS))
+    assert urls, "the badges need their font"
+    missing = [u for u in urls if not (repo_root / "web" / u).is_file()]
+    assert missing == [], missing
+    assert (repo_root / "web/fonts/LeagueSpartan-OFL.txt").is_file(), "ship the font's licence with it"
+
+
+def test_badges_keep_the_shape_of_the_icons_they_replaced(source):
+    """The movie layout sizes the row from each badge's own box (height: auto), so the badge
+    must carry the old 1408x238 aspect ratio and override the base icon height."""
+    rule = re.search(r"(?m)^\.badge \{([^}]*)\}", source(STYLES_CSS)).group(1)
+    assert "aspect-ratio: 1408 / 238;" in rule
+    assert "height: auto;" in rule
+    assert "container-type: inline-size;" in rule
 
 
 # --------------------------------------------------------------------------

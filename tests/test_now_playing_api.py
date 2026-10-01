@@ -206,7 +206,9 @@ def test_movie_payload(client, monitored):
     assert body["videoResolution"] == "4k"
     assert body["videoCodec"] == "HEVC"
     assert body["audioCodec"] == "EAC3"
-    assert body["audioChannels"] == "6.1"
+    assert body["audioChannels"] == "5.1"
+    assert body["audioProfile"] == ""
+    assert body["videoDynamicRange"] == ""
     assert body["poster"].startswith("/api/poster?")
 
 
@@ -496,24 +498,89 @@ def _with_audio(**stream):
     [
         (1, "1.0"),
         (2, "2.0"),
-        (6, "6.1"),
-        (8, "8.1"),
+        (3, "2.1"),
+        (6, "5.1"),
+        (7, "6.1"),
+        (8, "7.1"),
         (0, ""),
         (None, ""),
     ],
 )
 def test_audio_channel_labels(client, monitored, channels, expected):
-    """Note the quirk: any layout above stereo is labelled ``<channels>.1``.
-
-    Plex's channel count includes the LFE channel, so a 5.1 track arrives as 6
-    channels and is reported as "6.1". ``web/app.js`` normalises that back to a
-    5.1 icon; see ``getAudioChannelIcon``.
-    """
+    """Plex's channel count includes the LFE channel: 6 channels is 5.1, 8 is 7.1. The proxy
+    used to label N channels "N.1", so every 7.1 track came out "8.1" and got no badge."""
     stream = {"codec": "eac3"}
     if channels is not None:
         stream["channels"] = channels
     body = playing(client, monitored, _with_audio(**stream))
     assert body["audioChannels"] == expected
+
+
+@pytest.mark.parametrize(
+    "layout,channels,expected",
+    [
+        ("5.1(side)", 6, "5.1"),
+        ("7.1", 8, "7.1"),
+        ("stereo", 2, "2.0"),
+        ("mono", 1, "1.0"),
+        ("6.1", 7, "6.1"),
+        ("quad", 4, "4.0"),        # four full-range channels, no LFE (Astra pass 1 #2)
+        ("5.0(side)", 5, "5.0"),
+        ("", 6, "5.1"),            # no layout: from the count
+        ("downmix", 8, "7.1"),     # an unknown name: from the count
+        ("", 4, ""),               # 4 could be quad or 3.1: no guess
+        ("", 5, ""),
+    ],
+)
+def test_audio_channel_layout_wins_over_the_count(proxy_app, layout, channels, expected):
+    assert proxy_app.audio_layout({"audioChannelLayout": layout, "channels": channels}) == expected
+
+
+def test_audio_profile_is_reported_lowercased(client, monitored):
+    """The profile names Atmos and DTS-HD MA / DTS:X, which the audio badge shows."""
+    body = playing(client, monitored, _with_audio(codec="truehd", channels=8, audioChannelLayout="7.1",
+                                                  profile="Dolby TrueHD + Dolby Atmos"))
+    assert body["audioProfile"] == "dolby truehd + dolby atmos"
+    assert body["audioChannels"] == "7.1"
+
+
+@pytest.mark.parametrize(
+    "stream,expected",
+    [
+        ({"displayTitle": "4K DoVi/HDR10+", "DOVIPresent": True, "colorTrc": "smpte2084"}, "Dolby Vision"),
+        ({"displayTitle": "4K DoVi"}, "Dolby Vision"),
+        ({"displayTitle": "4K HDR10+", "colorTrc": "smpte2084"}, "HDR10+"),
+        ({"displayTitle": "4K HDR10", "colorTrc": "smpte2084"}, "HDR10"),
+        ({"displayTitle": "4K", "colorTrc": "smpte2084"}, "HDR10"),
+        ({"displayTitle": "1080p", "colorTrc": "arib-std-b67"}, "HLG"),
+        ({"displayTitle": "4K HDR", "colorTrc": "arib-std-b67"}, "HLG"),   # Astra pass 1 #1
+        ({"displayTitle": "4K HLG"}, "HLG"),
+        ({"displayTitle": "1080p", "colorTrc": "bt709"}, ""),
+        ({}, ""),
+    ],
+)
+def test_dynamic_range(proxy_app, stream, expected):
+    assert proxy_app.dynamic_range(stream) == expected
+
+
+def test_the_video_stream_reports_its_dynamic_range(client, monitored):
+    media = [
+        {
+            "videoResolution": "4k",
+            "videoCodec": "hevc",
+            "Part": [
+                {
+                    "Stream": [
+                        {"streamType": 2, "codec": "eac3", "channels": 6},
+                        {"streamType": 1, "codec": "hevc", "displayTitle": "4K DoVi/HDR10", "DOVIPresent": True},
+                    ]
+                }
+            ],
+        }
+    ]
+    body = playing(client, monitored, session(Media=media))
+    assert body["videoDynamicRange"] == "Dolby Vision"
+    assert body["audioCodec"] == "EAC3"
 
 
 def test_audio_codec_is_uppercased(client, monitored):

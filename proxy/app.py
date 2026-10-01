@@ -471,6 +471,42 @@ def display_title(title):
     return ' '.join(''.join(out).split()) or t
 
 
+# Plex's audioChannelLayout values ("5.1(side)", "stereo") and, when a stream has none, its
+# channel count (LFE included, so 6 is 5.1) as the speaker layout the badge shows. Counts
+# that could be either (4 is quad or 3.1, 5 is 5.0 or 4.1) give "" rather than a guess.
+_LAYOUT_NAMES = {'mono': '1.0', 'stereo': '2.0', 'quad': '4.0'}
+_CHANNEL_LAYOUTS = {1: '1.0', 2: '2.0', 3: '2.1', 6: '5.1', 7: '6.1', 8: '7.1'}
+
+
+def audio_layout(stream):
+    """"5.1", "7.1", "2.0", ... for an audio stream, or "" when Plex gives nothing usable."""
+    layout = str(stream.get('audioChannelLayout') or '').lower()
+    layout = _LAYOUT_NAMES.get(layout, layout.split('(')[0])
+    if re.fullmatch(r'\d\.\d', layout):
+        return layout
+    try:
+        channels = int(stream.get('channels') or 0)
+    except (TypeError, ValueError):
+        return ''
+    return _CHANNEL_LAYOUTS.get(channels, '')
+
+
+def dynamic_range(stream):
+    """"Dolby Vision", "HDR10+", "HDR10", "HLG" or "" (SDR) for a video stream. Dolby Vision
+    wins when a file also carries HDR10/HDR10+ ("4K DoVi/HDR10+")."""
+    title = str(stream.get('displayTitle') or '')
+    trc = str(stream.get('colorTrc') or '').lower()
+    if stream.get('DOVIPresent') or 'DoVi' in title:
+        return 'Dolby Vision'
+    if 'HDR10+' in title:
+        return 'HDR10+'
+    if trc == 'arib-std-b67' or 'HLG' in title:   # before the generic "HDR" (Astra pass 1 #1)
+        return 'HLG'
+    if trc == 'smpte2084' or 'HDR' in title:
+        return 'HDR10'
+    return ''
+
+
 def monitor_queue(base, token, verify_tls, queue_id, current_item_id, count=3):
     """The ``count`` items after ``current_item_id`` in Plex play queue ``queue_id`` ("up next").
 
@@ -701,18 +737,21 @@ def now_playing_body(srv, base, token, verify_tls):
             video_resolution = media_info.get('videoResolution', '')
             video_codec = media_info.get('videoCodec', '')
             
-            # Get audio info from first audio stream
+            # Audio from the first audio stream, HDR from the first video stream
             audio_codec = ''
             audio_channels = ''
+            audio_profile = ''
+            video_range = None
             for part in media_info.get('Part', []):
                 for stream in part.get('Stream', []):
-                    if stream.get('streamType') == 2:  # Audio stream
+                    if stream.get('streamType') == 1 and video_range is None:
+                        video_range = dynamic_range(stream)
+                    if stream.get('streamType') == 2 and not audio_codec:
                         audio_codec = stream.get('codec', '').upper()
-                        channels = stream.get('channels', 0)
-                        if channels:
-                            audio_channels = f"{channels}.1" if channels > 2 else f"{channels}.0"
-                        break
-                if audio_codec:
+                        audio_channels = audio_layout(stream)
+                        # "dolby truehd + dolby atmos", "ma + dts:x", "lc": what the badge names
+                        audio_profile = str(stream.get('profile') or '').lower()
+                if audio_codec and video_range is not None:
                     break
             
             # Calculate progress percentage
@@ -738,8 +777,10 @@ def now_playing_body(srv, base, token, verify_tls):
                 "viewOffset": view_offset,
                 "videoResolution": video_resolution,
                 "videoCodec": video_codec.upper(),
+                "videoDynamicRange": video_range or '',
                 "audioCodec": audio_codec,
                 "audioChannels": audio_channels,
+                "audioProfile": audio_profile,
                 "playerTitle": player.get('title', ''),
                 # Matches the clientIdentifier on Plex's notifications, which is where the
                 # monitor learns this player's play queue (sessions don't carry it).

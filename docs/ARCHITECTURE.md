@@ -188,9 +188,25 @@ Two things about `nowplaying` mode are worth knowing:
 - The movie/TV layout is one centred column with a single `2.5vw` gap between
   the marquee, the progress bar, the poster and the icon row. The bar, poster and
   icons share a `3vw` side margin. The poster has a set width (`94vw`), so a small
-  poster still scales up to the margins. Each icon's box is the drawn icon, so the
+  poster still scales up to the margins. Each badge's box is the drawn badge, so the
   space around the row is real. The rules are `.now-showing:not(.music)`, so music
   mode is unaffected.
+- The row's three badges (resolution, audio, rating) are drawn, not loaded:
+  `videoBadge()`, `audioBadge()` and `ratingBadge()` in `app.js` turn the
+  now-playing fields into a spec, and `badgeHtml()` renders it in the look of the
+  PNG set they replaced (2026-09-30). That look is a gold or silver band with a lead
+  label and a black box, or a rating-coloured band with the rating, a divider and its
+  meaning.
+  - Sizes are in `cqw` of the badge (`container-type: inline-size`, aspect
+    1408:238). A label's `--chars` shrinks it to fit.
+  - The font is League Spartan, served from `web/fonts/`.
+  - Dolby formats (Atmos, TrueHD, Digital, Digital+, Vision) carry the Dolby
+    double-D mark, an inline SVG from Simple Icons (CC0). Other audio gets a speaker.
+  - Video: `UHD | 4K`, `HD | 1080`, `SD | 480`. With HDR it's the resolution and
+    then the format (`4K | HDR10+`, `4K | ◖◗ VISION`).
+  - A rating with no entry gets a grey `RATED <x>` badge. A blank rating gets `N/A`.
+  - Why: the PNGs went by channel count alone. Atmos showed "5.1 SURROUND", 7.1
+    tracks had no badge, and 480p, HDR and most TV ratings had no icon.
   - At 1080p, `nowShowingFontSize` 11 (the wall's setting) just fits the marquee on one
     line. At 10 it has side margins.
   - A size too large for one line wraps.
@@ -405,7 +421,7 @@ web/app.js           kiosk logic: config, paging, rotation, transitions, dimming
 web/settings.html    settings form
 web/settings.js      loads/saves config, build status, test + preview buttons
 web/styles.css       everything visual, including all transition keyframes
-web/info-icons/      resolution / audio / content-rating badges (PNG)
+web/fonts/          League Spartan (OFL) for the metadata badges
 setup.sh             one-shot Pi provisioning; safe to re-run
 scripts/…-remote.ps1 Windows-side deploy/restart helper over SSH
 docs/                this documentation

@@ -147,68 +147,94 @@
     return out;
   }
 
-  // ---- icon mapping helpers ----
-  function getContentRatingIcon(rating) {
-    if (!rating || rating === 'N/A') return 'info-icons/Rated-NA.png';
-    
-    const ratingMap = {
-      'TV-Y': 'info-icons/Rated-TVY.png',
-      'TV-Y7': 'info-icons/Rated-TVY7.png',
-      'TV-Y7 FV': 'info-icons/Rated-TVY7.png',
-      'G': 'info-icons/Rated-G.png',
-      'TV-G': 'info-icons/Rated-TVG.png',
-      'PG': 'info-icons/Rated-PG.png',
-      'TV-PG': 'info-icons/Rated-TVPG.png',
-      'PG-13': 'info-icons/Rated-PG13.png',
-      'TV-14': 'info-icons/Rated-TV14.png',
-      'R': 'info-icons/Rated-R.png',
-      'TV-MA': 'info-icons/Rated-TVMA.png',
-      'NC-17': 'info-icons/Rated-NC17.png',
-      'XXX': 'info-icons/Rated-XXX.png'
-    };
-    
-    return ratingMap[rating] || 'info-icons/Rated-NA.png';
+  // ---- metadata badges ----
+  // The resolution, audio and rating badges under the poster are drawn from the now-playing
+  // data (no image files): a coloured band holding either a lead label and a black box
+  // ("tag": video in gold, audio in silver) or a rating, a divider and its meaning. Each badge
+  // is { kind, color, lead, mark, text, title, sub, label }; badgeHtml() renders it.
+  // Marks, drawn in currentColor: the Dolby double-D (Simple Icons, CC0) and a speaker.
+  const MARKS = {
+    dolby: '<svg viewBox="0 3.564 24 16.872" aria-hidden="true"><path d="M0 3.564v16.872h2.488c4.648 0 8.438-3.788 8.438-8.436s-3.79-8.436-8.438-8.436H0zm21.512 0c-4.648 0-8.438 3.788-8.438 8.436s3.79 8.436 8.438 8.436H24V3.564h-2.488z"/></svg>',
+    speaker: '<svg viewBox="1 2 21 20" aria-hidden="true"><path d="M2 8.5h4.5L12 3.5v17l-5.5-5H2z"/><path d="M15 8.2a5 5 0 0 1 0 7.6M17.6 5.6a8.6 8.6 0 0 1 0 12.8M20.2 3a12.2 12.2 0 0 1 0 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+  };
+
+  const RATINGS = {
+    'G': ['green', 'GENERAL AUDIENCES', 'ALL AGES ADMITTED'],
+    'PG': ['orange', 'PARENTAL GUIDANCE SUGGESTED', 'SOME MATERIAL MAY NOT BE SUITABLE FOR CHILDREN'],
+    'PG-13': ['orange', 'PARENTS STRONGLY CAUTIONED', 'SOME MATERIAL MAY BE INAPPROPRIATE FOR CHILDREN UNDER 13'],
+    'R': ['red', 'RESTRICTED', 'UNDER 17 REQUIRES ACCOMPANYING PARENT OR ADULT GUARDIAN'],
+    'NC-17': ['red', 'NO ONE 17 AND UNDER ADMITTED', ''],
+    'TV-Y': ['green', 'ALL CHILDREN', 'APPROPRIATE FOR ALL CHILDREN'],
+    'TV-Y7': ['green', 'DIRECTED TO OLDER CHILDREN', 'MOST APPROPRIATE FOR CHILDREN AGE 7 AND UP'],
+    'TV-Y7-FV': ['green', 'DIRECTED TO OLDER CHILDREN', 'FANTASY VIOLENCE'],
+    'TV-G': ['green', 'GENERAL AUDIENCE', 'SUITABLE FOR ALL AGES'],
+    'TV-PG': ['orange', 'PARENTAL GUIDANCE SUGGESTED', 'MAY BE UNSUITABLE FOR YOUNGER CHILDREN'],
+    'TV-14': ['orange', 'PARENTS STRONGLY CAUTIONED', 'MAY BE UNSUITABLE FOR CHILDREN UNDER 14'],
+    'TV-MA': ['red', 'MATURE AUDIENCES ONLY', 'MAY BE UNSUITABLE FOR CHILDREN UNDER 17'],
+    'NR': ['gray', 'NOT RATED', ''],
+    'PASSED': ['gray', 'APPROVED', 'UNDER THE PRODUCTION CODE'],
+    'XXX': ['red', 'DAM! YOU A FREAK! ;)', '']
+  };
+  const RATING_ALIASES = { 'NOT RATED': 'NR', 'UNRATED': 'NR', 'TV-Y7 FV': 'TV-Y7-FV' };
+
+  function ratingBadge(rating) {
+    // Plex prefixes some non-US ratings with a country ("gb/15")
+    const raw = String(rating || '').trim().replace(/^[a-z]{2}\//i, '');
+    const key = RATING_ALIASES[raw.toUpperCase()] || raw.toUpperCase();
+    if (!raw || key === 'N/A') {
+      return { kind: 'rating', color: 'gray', lead: 'N/A', title: 'NOT RATED', sub: 'RATING IS NOT SET', label: 'Not rated' };
+    }
+    const [color, title, sub] = RATINGS[key] || ['gray', 'RATED ' + raw.toUpperCase(), ''];
+    return { kind: 'rating', color, lead: RATINGS[key] ? key : raw.toUpperCase(), title, sub, label: 'Rated ' + raw };
   }
 
-  function getVideoResolutionIcon(resolution) {
-    if (!resolution || resolution === 'N/A') return null;
-    
-    const resMap = {
-      'sd': 'info-icons/Res-SD.png',
-      '720': 'info-icons/Res-HD720.png',
-      '720p': 'info-icons/Res-HD720.png',
-      '1080': 'info-icons/Res-HD1080.png',
-      '1080p': 'info-icons/Res-HD1080.png',
-      '4k': 'info-icons/Res-UHD4K.png',
-      '8k': 'info-icons/Res-UHD8K.png'
-    };
-    
-    return resMap[resolution.toLowerCase()] || null;
+  function videoBadge(resolution, dynamicRange) {
+    const res = String(resolution || '').toLowerCase().replace(/p$/, '');
+    const hdr = String(dynamicRange || '');
+    if (!res || res === 'n/a') return null;
+    const name = { sd: 'SD', '480': '480', '576': '576', '720': '720', '1080': '1080', '2k': '2K', '4k': '4K', '8k': '8K' }[res];
+    if (!name) return null;
+    const label = (name + ' ' + hdr).trim();
+    // HDR leads with the resolution and names the format in the box; Dolby Vision gets the mark
+    if (hdr === 'Dolby Vision') return { kind: 'tag', color: 'gold', lead: name, mark: 'dolby', text: 'VISION', label };
+    if (hdr) return { kind: 'tag', color: 'gold', lead: name, text: hdr === 'HDR10' ? 'HDR' : hdr, label };
+    const grade = ['4K', '8K'].includes(name) ? 'UHD' : ['720', '1080', '2K'].includes(name) ? 'HD' : 'SD';
+    return { kind: 'tag', color: 'gold', lead: grade, text: name === 'SD' ? 'STANDARD' : name, label };
   }
 
-  function getAudioChannelIcon(channels) {
-    if (!channels || channels === 'N/A') return null;
-    
-    const channelMap = {
-      'mono': 'info-icons/Sound-Mono.png',
-      'stereo': 'info-icons/Sound-2.0.png',
-      '2.0': 'info-icons/Sound-2.0.png',
-      '5.1': 'info-icons/Sound-5.1.png',
-      '6.1': 'info-icons/Sound-5.1.png', // Use 5.1 icon for 6.1 as they're visually similar
-      '7.1': 'info-icons/Dolby_TRUEHD71.png'
-    };
-    
-    // Handle 5.1 variations (5.1, 5.1(side), etc.)
-    if (channels.includes('5.1')) {
-      return 'info-icons/Sound-5.1.png';
+  function audioBadge(codec, channels, profile) {
+    const c = String(codec || '').toLowerCase();
+    const p = String(profile || '').toLowerCase();
+    const layout = String(channels || '');
+    if (!c && !layout) return null;
+    const label = [codec, layout].filter(Boolean).join(' ');
+    const dolby = text => ({ kind: 'tag', color: 'silver', mark: 'dolby', text, label });
+    const speaker = text => ({ kind: 'tag', color: 'silver', mark: 'speaker', text, label });
+    if (p.includes('atmos')) return dolby('ATMOS');
+    if (c === 'truehd') return dolby(('TRUEHD ' + layout).trim());
+    if (c === 'eac3') return dolby(('DIGITAL+ ' + layout).trim());
+    if (c === 'ac3') return dolby(('DIGITAL ' + layout).trim());
+    if (c === 'dca' || c === 'dts') {
+      const name = p.includes('dts:x') ? 'DTS:X' : p.includes('ma') ? 'DTS-HD MA' : p.includes('hra') ? 'DTS-HD' : 'DTS';
+      return speaker((name + ' ' + layout).trim());
     }
-    
-    // Handle 6.1 variations  
-    if (channels.includes('6.1')) {
-      return 'info-icons/Sound-5.1.png';
-    }
-    
-    return channelMap[channels.toLowerCase()] || null;
+    const named = { '1.0': 'MONO', '2.0': '2.0 STEREO' }[layout];
+    if (named) return speaker(named);
+    if (layout) return speaker(layout + ' SURROUND');
+    return speaker(c.toUpperCase());
+  }
+
+  function badgeHtml(b) {
+    // --chars lets the CSS shrink a long label to fit its box
+    const sized = (cls, text) => `<span class="${cls}" style="--chars: ${Math.max(String(text).length, 1)}">${escapeHtml(text)}</span>`;
+    const lead = b.lead ? sized('badge-lead', b.lead) : `<span class="badge-lead badge-mark-${b.mark}">${MARKS[b.mark]}</span>`;
+    const body = b.kind === 'rating'
+      ? `<span class="badge-divider"></span><span class="badge-words">${sized('badge-title', b.title)}` +
+        (b.sub ? sized('badge-sub', b.sub) : '') + '</span>'
+      : `<span class="badge-box">${b.lead && b.mark ? `<span class="badge-box-mark">${MARKS[b.mark]}</span>` : ''}` +
+        `${sized('badge-text', b.text)}</span>`;
+    return `<div class="now-showing-metadata-icon badge badge-${b.kind} badge-${b.color}" role="img" ` +
+      `aria-label="${escapeHtml(b.label)}"><div class="badge-face">${lead}${body}</div></div>`;
   }
 
   function hexToRgb(hex) {
@@ -446,7 +472,10 @@
       poster: item ? item.poster : '',
       rating: item ? item.rating : 'PG-13',
       videoResolution: '4k',
-      audioChannels: '5.1'
+      videoDynamicRange: 'Dolby Vision',
+      audioCodec: 'TRUEHD',
+      audioChannels: '7.1',
+      audioProfile: 'dolby truehd + dolby atmos'
     };
     if (musicVideo) {
       preview.mediaType = 'musicvideo';
@@ -692,29 +721,13 @@
     } else if (iconsContainer) {
       iconsContainer.innerHTML = '';
 
-      // Create and add icons based on available metadata
-      const icons = [];
-      
-      // Video resolution icon
-      const videoIcon = getVideoResolutionIcon(data.videoResolution);
-      if (videoIcon) {
-        icons.push(`<img src="${videoIcon}" class="now-showing-metadata-icon" alt="${data.videoResolution || 'Unknown Resolution'}" />`);
-      }
-      
-      // Audio channels icon
-      const audioIcon = getAudioChannelIcon(data.audioChannels);
-      if (audioIcon) {
-        icons.push(`<img src="${audioIcon}" class="now-showing-metadata-icon" alt="${data.audioChannels || 'Unknown Audio'}" />`);
-      }
-      
-      // Content rating icon (always show, fallback to N/A)
-      const ratingIcon = getContentRatingIcon(data.rating);
-      if (ratingIcon) {
-        icons.push(`<img src="${ratingIcon}" class="now-showing-metadata-icon" alt="${data.rating || 'Not Rated'}" />`);
-      }
-      
-      // Insert all icons
-      iconsContainer.innerHTML = icons.join('');
+      // Resolution and audio when Plex reports them; the rating always (N/A when unset)
+      const badges = [
+        videoBadge(data.videoResolution, data.videoDynamicRange),
+        audioBadge(data.audioCodec, data.audioChannels, data.audioProfile),
+        ratingBadge(data.rating)
+      ].filter(Boolean);
+      iconsContainer.innerHTML = badges.map(badgeHtml).join('');
     }
 
     // Show now playing screen

@@ -517,6 +517,129 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   transform: scale(1.05);
 }
 
+/* Generated metadata badges (app.js badgeHtml), drawn at the 1408x238 proportions of the
+   PNG icons they replaced. Sizes are in cqw, hundredths of the badge's width, so a badge
+   scales as one piece. A label's --chars (its length) shrinks it to fit its box. */
+@font-face {
+  font-family: 'League Spartan';
+  src: url('fonts/LeagueSpartan-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'League Spartan';
+  src: url('fonts/LeagueSpartan-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: block;
+}
+
+.badge {
+  container-type: inline-size;
+  aspect-ratio: 1408 / 238;
+  height: auto;
+}
+
+.badge-gold { --band: #d4af37; }
+.badge-silver { --band: #c0c0c0; }
+.badge-green { --band: #3ab242; }
+.badge-orange { --band: #f78f20; }
+.badge-red { --band: #ff0000; }
+.badge-gray { --band: #c0c0c0; }
+
+.badge-face {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  padding: 2.13cqw 2.13cqw 2.13cqw 0;
+  background: var(--band);
+  color: #000;
+  font-family: 'League Spartan', 'Montserrat', system-ui, sans-serif;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.badge-rating .badge-face {
+  padding: 1.07cqw 2.13cqw 1.07cqw 0;
+}
+
+.badge-face > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.badge-lead,
+.badge-text,
+.badge-title {
+  padding-top: 0.12em; /* League Spartan's caps sit high in its line box */
+}
+
+.badge-lead {
+  flex: 0 0 24.2cqw;
+  font-size: min(8.8cqw, calc(26cqw / var(--chars)));
+}
+
+.badge-lead svg {
+  fill: currentColor;
+  display: block;
+}
+
+.badge-mark-dolby svg { height: 12.3cqw; }
+.badge-mark-speaker svg { height: 12.6cqw; }
+
+.badge-box {
+  flex: 1 1 0;
+  gap: 1.6cqw;
+  background: #000;
+  color: var(--band);
+}
+
+.badge-text {
+  font-size: min(8.4cqw, calc(92cqw / var(--chars)));
+  letter-spacing: 0.04em;
+}
+
+.badge-box-mark svg {
+  height: 6.2cqw;
+  fill: currentColor;
+  display: block;
+}
+
+.badge-rating .badge-lead {
+  flex-basis: 22.6cqw;
+  font-size: min(10.7cqw, calc(28cqw / var(--chars)));
+}
+
+.badge-divider {
+  flex: 0 0 1cqw;
+  background: #000;
+}
+
+.badge-words {
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 1.4cqw;
+  padding: 0 1.5cqw;
+}
+
+.badge-title {
+  font-size: min(5.8cqw, calc(100cqw / var(--chars)));
+  letter-spacing: 0.12em;
+}
+
+.badge-sub {
+  font-size: min(3cqw, calc(190cqw / var(--chars)));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  white-space: normal;
+}
+
 /* Legacy metadata styles - keeping for backwards compatibility */
 .now-showing-metadata-item {
   display: flex;

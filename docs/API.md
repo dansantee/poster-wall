@@ -268,7 +268,9 @@ contacts Plex at all.
   "videoResolution": "1080",
   "videoCodec": "H264",
   "audioCodec": "EAC3",
-  "audioChannels": "6.1",
+  "audioChannels": "5.1",
+  "audioProfile": "",
+  "videoDynamicRange": "",
   "playerTitle": "Bedroom",
   "mediaType": "episode",
   "ratingKey": "202",
@@ -290,7 +292,9 @@ contacts Plex at all.
 | `progress` | `viewOffset / duration * 100`, clamped to 0–100, rounded to 1 decimal; `0` when duration is 0 |
 | `duration`, `viewOffset` | Milliseconds, as Plex reports them |
 | `videoCodec`, `audioCodec` | Uppercased |
-| `audioChannels` | `"<n>.0"` for mono/stereo, `"<n>.1"` above that, `""` when unknown. Plex counts LFE, so a 5.1 track arrives as 6 channels and is reported as `6.1`; `app.js` maps that back to the 5.1 icon |
+| `audioChannels` | The speaker layout: `"1.0"`, `"2.0"`, `"5.1"`, `"7.1"`… from Plex's `audioChannelLayout` (`"5.1(side)"` → `"5.1"`, `"stereo"` → `"2.0"`), else from the channel count, which includes LFE (6 → `"5.1"`, 8 → `"7.1"`). `""` when unknown, or for a bare 4 or 5 channels (quad or 3.1, 5.0 or 4.1) |
+| `audioProfile` | The audio stream's Plex `profile`, lowercased: `"dolby truehd + dolby atmos"`, `"ma + dts:x"`, `"lc"`; `""` when absent. The audio badge names Atmos, DTS-HD MA and DTS:X from it |
+| `videoDynamicRange` | `"Dolby Vision"`, `"HDR10+"`, `"HDR10"`, `"HLG"`, or `""` for SDR, from the first video stream (`DOVIPresent`, `displayTitle`, `colorTrc`). Dolby Vision wins over the HDR10 base layer |
 | `poster` | Relative proxy URL, or `null` if no artwork could be found |
 | `state` | Plex's `Player.state`: `playing`, `paused` or `buffering` (`playing` if absent). The kiosk advances the bar only while `playing` and shows the pause treatment for `paused` |
 | `offsetAt` | When `viewOffset` was observed, in ms since the epoch (proxy clock, which is the kiosk's clock on the Pi). The monitor keeps the *first* time an unchanged offset was seen, because Plex repeats a stale offset between the player's ~10 s reports |

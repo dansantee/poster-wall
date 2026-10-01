@@ -147,7 +147,7 @@ pwsh -NoProfile -File scripts/poster-wall-remote.ps1 -Action direct-deploy -Path
 
 With no `-Path` it uploads every modified and untracked file (`git diff
 --name-only` plus `git ls-files --others --exclude-standard`), then restarts the
-services. Source files go over SFTP as UTF-8 text; anything else (the PNG icons)
+services. Source files go over SFTP as UTF-8 text; anything else (the badge fonts)
 is copied byte-for-byte.
 
 The Pi's commit is now *behind* what is actually running, and the settings page
