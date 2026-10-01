@@ -406,6 +406,52 @@
     return `rgb(${Math.round(r / n * darken)}, ${Math.round(g / n * darken)}, ${Math.round(b / n * darken)})`;
   }
 
+  // The accent from scored pixels ({ rgb, score }): the most vivid pixels' colour, lifted to a
+  // bright saturated tone, and its hue. Also the most vivid colour at least ACCENT_SECOND_GAP
+  // degrees of hue away (second, secondHue), for posters whose main colour is the marquee's own.
+  const ACCENT_SECOND_GAP = 40;
+  const ACCENT_SECOND_MIN_SCORE = 0.3;
+  function hueGap(a, b) {
+    const d = Math.abs(a - b) % 360;
+    return Math.min(d, 360 - d);
+  }
+
+  function artAccents(pixels) {
+    const lift = (rgbs, minS = 0.55, l = 66) => {
+      const avg = [0, 1, 2].map(k => rgbs.reduce((sum, rgb) => sum + rgb[k], 0) / rgbs.length);
+      const hsl = rgbToHsl(avg[0], avg[1], avg[2]);
+      return { color: `hsl(${Math.round(hsl.h)}, ${Math.round(Math.max(hsl.s, minS) * 100)}%, ${l}%)`, hue: hsl.h };
+    };
+    const top = Math.max(...pixels.map(p => p.score));
+    if (!(top >= 0.15)) return { accent: null, accentHue: null, second: null, secondHue: null };
+    const first = lift(pixels.filter(p => p.score >= top * 0.6).map(p => p.rgb));
+    const others = pixels
+      .map(p => ({ ...p, hue: rgbToHsl(...p.rgb).h }))
+      .filter(p => p.score >= ACCENT_SECOND_MIN_SCORE && hueGap(p.hue, first.hue) >= ACCENT_SECOND_GAP);
+    let second = null;
+    if (others.length) {
+      const best = others.reduce((a, b) => (b.score > a.score ? b : a));
+      // A minority colour is often a dark one (Doom Patrol's reds average to a dusty pink at
+      // the first colour's 55% floor), so the second gets a stronger saturation floor
+      second = lift(others.filter(p => p.score >= best.score * 0.6 && hueGap(p.hue, best.hue) < 20).map(p => p.rgb), 0.8, 62);
+    }
+    return { accent: first.color, accentHue: first.hue, second: second && second.color, secondHue: second && second.hue };
+  }
+
+  // Movies and TV: the poster's accent, unless it would look like the configured marquee
+  // colour anyway (Dan, 2026-10-01: Doom Patrol's yellow Season 3 poster came out the default
+  // pale yellow); then its second colour (the red there), if it has one.
+  const ACCENT_LIKE_CONFIGURED = 25;
+  function movieAccent(colors, configuredHex) {
+    if (!colors || !colors.accent) return null;
+    const rgb = hexToRgb(configuredHex);
+    const conf = rgb && rgbToHsl(rgb.r, rgb.g, rgb.b);
+    if (conf && conf.s >= 0.2 && colors.second && hueGap(colors.accentHue, conf.h) < ACCENT_LIKE_CONFIGURED) {
+      return colors.second;
+    }
+    return colors.accent;
+  }
+
   function computeArtColors(src) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -423,16 +469,7 @@
           pixels.push({ rgb: [data[i], data[i+1], data[i+2]], score: hsl.s * (1 - Math.abs(hsl.l - 0.5) * 2) });
         }
         const backdrop = backdropColor(data);
-
-        const top = Math.max(...pixels.map(p => p.score));
-        let accent = null;
-        if (top >= 0.15) {
-          const vivid = pixels.filter(p => p.score >= top * 0.6);
-          const avg = [0, 1, 2].map(k => vivid.reduce((sum, p) => sum + p.rgb[k], 0) / vivid.length);
-          const hsl = rgbToHsl(avg[0], avg[1], avg[2]);
-          accent = `hsl(${Math.round(hsl.h)}, ${Math.round(Math.max(hsl.s, 0.55) * 100)}%, 66%)`;
-        }
-        resolve({ backdrop, accent });
+        resolve({ backdrop, ...artAccents(pixels) });
       };
       img.onerror = () => resolve(null);
       img.src = src;
@@ -710,7 +747,8 @@
       const colorsFor = nowPlayingKey(data);
       computeArtColors(prox(data.poster)).then(colors => {
         if (currentItemKey !== colorsFor) return;
-        if (colors && colors.accent) nowShowing.style.setProperty('--movie-accent', colors.accent);
+        const accent = movieAccent(colors, cfg.nowShowingColor);
+        if (accent) nowShowing.style.setProperty('--movie-accent', accent);
         else nowShowing.style.removeProperty('--movie-accent');
       });
     } else {

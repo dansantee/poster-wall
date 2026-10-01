@@ -385,9 +385,10 @@ def test_badges_keep_the_shape_of_the_icons_they_replaced(source):
 # --------------------------------------------------------------------------
 # Movie/TV: poster colour, the details line, the poster always full width
 # --------------------------------------------------------------------------
-def _run_js(source, names, calls, prelude=""):
+def _run_js(source, names, calls, prelude="", setup=""):
     """Run named top-level-in-the-IIFE functions (and consts) from app.js in Node.
-    names: function or const names to lift; calls: JS expressions; returns their values."""
+    names: function or const names to lift; calls: JS expressions; returns their values.
+    prelude runs before the lifted code (mocks it uses), setup after it (data built with it)."""
     body = source(APP_JS)
     parts = []
     for name in names:
@@ -395,7 +396,7 @@ def _run_js(source, names, calls, prelude=""):
             re.search(r"\n  (function %s\(.*?\n  \}\n)" % re.escape(name), body, re.S)
         assert m, "app.js has no " + name
         parts.append(m.group(1))
-    script = prelude + "".join(parts) + "\nconsole.log(JSON.stringify([" + ",".join(calls) + "]));"
+    script = prelude + "".join(parts) + setup + "\nconsole.log(JSON.stringify([" + ",".join(calls) + "]));"
     return json.loads(subprocess.run(["node"], input=script, capture_output=True, text=True,
                                      check=True).stdout)
 
@@ -480,9 +481,60 @@ def test_the_marquee_and_bar_take_the_posters_colour(source):
     assert "color: var(--movie-accent, var(--now-showing-color));" in css
     assert "background-color: var(--movie-accent, var(--progress-bar-color, #F4E88A));" in css
     app_js = source(APP_JS)
-    assert "nowShowing.style.setProperty('--movie-accent', colors.accent);" in app_js
+    assert "const accent = movieAccent(colors, cfg.nowShowingColor);" in app_js
+    assert "nowShowing.style.setProperty('--movie-accent', accent);" in app_js
     # back to the configured colours between items and on the way back to the rotation
     assert app_js.count("nowShowing.style.removeProperty('--movie-accent');") >= 3
+
+
+@needs_node
+def test_a_poster_whose_colour_is_the_marquees_own_uses_its_second(source):
+    """Dan, 2026-10-01: Doom Patrol's Season 3 poster is nearly all yellow, so its accent came out
+    beside the default pale yellow; he expected the red that's also in it. When the accent's hue
+    is within ACCENT_LIKE_CONFIGURED of the configured marquee colour, use the poster's second
+    colour (at least ACCENT_SECOND_GAP away), if it has one."""
+    names = ["rgbToHsl", "hexToRgb", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "hueGap",
+             "artAccents", "ACCENT_LIKE_CONFIGURED", "movieAccent"]
+    # scored pixels as computeArtColors builds them
+    setup = """
+const px = (rgb) => { const h = rgbToHsl(...rgb); return { rgb, score: h.s * (1 - Math.abs(h.l - 0.5) * 2) }; };
+const yellowRed = [...Array(200).fill([232, 190, 20]), ...Array(20).fill([200, 25, 40]), ...Array(36).fill([20, 20, 20])].map(px);
+const yellowOnly = [...Array(220).fill([232, 190, 20]), ...Array(36).fill([20, 20, 20])].map(px);
+const blueRed = [...Array(200).fill([30, 90, 220]), ...Array(20).fill([200, 25, 40]), ...Array(36).fill([20, 20, 20])].map(px);
+const grey = Array(256).fill([128, 128, 128]).map(px);
+"""
+    out = _run_js(source, names, [
+        "artAccents(yellowRed)",
+        "artAccents(grey)",
+        "movieAccent(artAccents(yellowRed), '#F4E88A')",    # yellow like the default: the red
+        "movieAccent(artAccents(yellowOnly), '#F4E88A')",   # no second colour: keep the yellow
+        "movieAccent(artAccents(blueRed), '#F4E88A')",      # unlike the default: keep the blue
+        "movieAccent(artAccents(yellowRed), '#cccccc')",    # a grey marquee colour: no rule
+        "movieAccent(artAccents(grey), '#F4E88A')",
+        "movieAccent(null, '#F4E88A')",
+    ], setup=setup)
+    hue = lambda c: int(re.match(r"hsl\((\d+),", c).group(1))
+    first, none = out[0], out[1]
+    assert 40 <= hue(first["accent"]) <= 55 and 345 <= hue(first["second"]) <= 359, first
+    assert none == {"accent": None, "accentHue": None, "second": None, "secondHue": None}
+    assert out[2] == first["second"]                     # the red
+    assert 40 <= hue(out[3]) <= 55                       # still yellow
+    assert 210 <= hue(out[4]) <= 230                     # still blue
+    assert out[5] == first["accent"]
+    assert out[6] is None and out[7] is None
+
+
+def test_the_marquee_box_is_trimmed_to_its_capitals(source):
+    """Dan, 2026-10-01: the space between NOW SHOWING and the bar was the font's own room under
+    the capitals. Trimming the box to them let the marquee grow (Bebas 21) at the same height."""
+    css = source(STYLES_CSS)
+    assert re.search(r"@supports \(text-box: trim-both cap alphabetic\) \{\s*"
+                     r"\.now-showing:not\(\.music\) \.now-showing-title \{\s*line-height: 1;\s*"
+                     r"text-box: trim-both cap alphabetic;", css)
+    # the settings page accepts the wall's values (size 21, kerning 0.035)
+    settings = source(SETTINGS_HTML)
+    assert 'id="nowShowingFontSize" min="5" max="24"' in settings
+    assert 'id="nowShowingKerning" min="-0.5" max="1.0" step="0.005"' in settings
 
 
 def test_the_details_line_is_movie_and_tv_only(source):

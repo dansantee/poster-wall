@@ -690,12 +690,21 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 .now-showing:not(.music) .now-showing-title {
   margin: 0;
   /* Capitals fill about 0.7em, so a line box of 1 left a black band above and below the
-     word; 0.8 gives that height to the poster (Dan, 2026-09-30, Bebas Neue at 19) */
+     word; 0.8 gives that height to the poster (Dan, 2026-09-30, Bebas Neue at 19). Where
+     text-box is supported (Chromium 133+; the Pi has 139) the box is trimmed to the capitals
+     exactly, below, so a bigger marquee costs no extra height. */
   line-height: 0.8;
   /* The letter-spacing trails the last letter; an indent of the same width re-centres the word.
      text-indent, unlike padding, also takes a negative kerning (Astra pass 1 #1). app.js sets
      --now-showing-kerning from the nowShowingKerning setting. */
   text-indent: var(--now-showing-kerning, 0.1em);
+}
+
+@supports (text-box: trim-both cap alphabetic) {
+  .now-showing:not(.music) .now-showing-title {
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+  }
 }
 
 .now-showing:not(.music) .now-showing-progress {

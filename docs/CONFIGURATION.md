@@ -29,9 +29,9 @@ that is what the **Restart Kiosk** button is for.
   "nowShowingText": "NOW SHOWING",
   "musicVideoSectionId": ["8"],
   "nowShowingFont": "'Bebas Neue', sans-serif",
-  "nowShowingFontSize": 18,
+  "nowShowingFontSize": 21,
   "nowShowingFontWeight": 400,
-  "nowShowingKerning": 0.08,
+  "nowShowingKerning": 0.035,
   "nowShowingColor": "#f4e88a",
   "progressBarColor": "#f4e88a",
   "progressTrackColor": "#788496",
@@ -89,8 +89,8 @@ Rec. 601 luma over a 32×32 sample is ≥ 200 of 255.
 | --- | --- | --- | --- |
 | `nowShowingText` | string | `"NOW SHOWING"` | The marquee text. The movie or episode title appears in the smaller details line under the bar, not the marquee. |
 | `nowShowingFont` | string | `"'Bebas Neue', sans-serif"` | A CSS `font-family` value, chosen from the dropdown. Bebas Neue is served from `web/fonts/`; the other Google Fonts options are preloaded by `index.html` from Google; anything else must be installed on the Pi. |
-| `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. UI range 5–20. The pixel caps mean the same value looks twice as big at 1080p as at 4K (22 was right at 4K; the 1080p wall uses 11). At 1080×1920 the wall uses Bebas Neue at 18 with kerning 0.08 (weight 400). 19 runs "NOW SHOWING" to within about 30 px of each edge, and 18 leaves the poster more height under the details line. Kerning 0.1 at 19, or 0.22 at 15, wraps it. With Cinzel, 11 just fits. |
-| `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1. The title gets a `text-indent` of the same width (`--now-showing-kerning`), so it stays centred despite the spacing after the last letter, negative values included. |
+| `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. The pixel caps mean the same value looks twice as big at 1080p as at 4K (22 was right at 4K; the 1080p wall uses 11). At 1080×1920 the wall uses Bebas Neue at 21 with kerning 0.035 (weight 400): with the marquee box trimmed to its capitals, that runs "NOW SHOWING" to within about 27 px of each edge at the height 18 used to take. UI range 5–24. Kerning 0.1 at 19, or 0.22 at 15, wraps it. With Cinzel, 11 just fits. |
+| `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1, step 0.005. The title gets a `text-indent` of the same width (`--now-showing-kerning`), so it stays centred despite the spacing after the last letter, negative values included. |
 | `nowShowingFontWeight` | number | `700` | 300–900 in steps of 100. Only weights the loaded font actually ships will look different. |
 | `nowShowingColor` | string | `"#F4E88A"` | Marquee text colour, written to the `--now-showing-color` custom property. |
 

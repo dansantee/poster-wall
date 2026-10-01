@@ -205,9 +205,18 @@ Two things about `nowplaying` mode are worth knowing:
   - It runs on the poster's load, after the details line changes, and on resize.
   - The crop is capped at 10% (`POSTER_FILL_MAX_CROP`). Anything needing more, such as a
     16:9 episode frame used as last-resort artwork, is still drawn whole.
+- **The marquee's box is trimmed to its capitals** (`text-box: trim-both cap
+  alphabetic`, Chromium 133+; `line-height: 0.8` elsewhere). The font's room under the
+  capitals used to leave a band between NOW SHOWING and the bar. Trimmed, the marquee
+  grows (Bebas Neue 21) at the same height (2026-10-01).
 - **The marquee and bar take the poster's colour.** `computeArtColors()`, the music
   screen's accent, picks the poster's vivid colour. That colour becomes `--movie-accent`
   on `#nowShowing`, and the title (with its glow), the bar and the end time use it.
+  - When the accent's hue is within 25° of the configured `nowShowingColor`, it would
+    look like the default anyway. Then `movieAccent()` uses the poster's second colour,
+    the most vivid hue at least 40° away (`artAccents()`), with a stronger saturation
+    floor because a minority colour is often a dark one. Doom Patrol's yellow Season 3
+    poster comes out red (2026-10-01).
   - The previous colour stays until the new one is known.
   - A poster with no vivid colour, one that fails to load, or the way back to the
     rotation clears it. The configured `nowShowingColor` / `progressBarColor` apply
