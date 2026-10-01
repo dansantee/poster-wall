@@ -6,7 +6,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-434 tests, a couple of seconds, no network, no Plex server, no browser.
+440 tests, a couple of seconds, no network, no Plex server, no browser.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_now_playing_api.py -v   # one file
@@ -43,7 +43,7 @@ So the suite has two halves:
 | `test_now_playing_api.py` | 174 | `/api/now-playing`: device whitelist, library whitelist, media-type filter, music videos, progress maths, `state`/`offsetAt`/`playerId`, audio-channel labels and profile, HDR detection, the whole episode-artwork fallback chain, the monitor cache and its direct fallback, `monitor_queue()` (up next), `short_title()`, `display_title()`, and fun facts from the Plex summary (background fetch, cache key, TTL) |
 | `test_plex_events.py` | 50 | `plex_events.py`: the websocket client's framing, ping/pong, close, and overall (not per-read) handshake and receive deadlines; the monitor's trigger filtering, follow-up and safety refreshes, `offsetAt` rule, keepalive, poll fallback and reconnects, and per-queue-item up-next caching |
 | `test_restart_kiosk.py` | 10 | `/api/restart-kiosk`: the exact systemctl command, admin key, timeout and failure handling |
-| `test_frontend_contract.py` | 80 | Element ids, transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
+| `test_frontend_contract.py` | 86 | Element ids, transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
 | `test_deployment_contract.py` | 34 | Ports, systemd unit names, rotation flags, the CJK font package, the kiosk's cache clear at start, `SECRETS.md` labels, gitignore hygiene |
 
 ## Fixtures worth knowing

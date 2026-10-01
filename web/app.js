@@ -698,11 +698,27 @@
       applyFontSettings(cfg);
     }
     if (poster && data.poster) {
-      poster.onload = placePauseBadge;
+      poster.onload = () => { placePauseBadge(); fitPoster(); };
       poster.src = prox(data.poster);
     }
     setScrollingText(artistEl, isMusicVideo ? (data.artist || '') : '');
     setScrollingText(songEl, isMusicVideo ? (data.displayTitle || data.trackTitle || data.title || '') : '');
+    // Movies and TV: the marquee and the bar take the poster's vivid colour (Dan, 2026-09-30).
+    // The old colour stays until the new one is known; a poster with none (black and white,
+    // or one that fails to load) goes back to the configured colours.
+    if (!isMusicVideo && data.poster) {
+      const colorsFor = nowPlayingKey(data);
+      computeArtColors(prox(data.poster)).then(colors => {
+        if (currentItemKey !== colorsFor) return;
+        if (colors && colors.accent) nowShowing.style.setProperty('--movie-accent', colors.accent);
+        else nowShowing.style.removeProperty('--movie-accent');
+      });
+    } else {
+      nowShowing.style.removeProperty('--movie-accent');
+    }
+    const whatEl = document.getElementById('nowShowingWhat');
+    if (whatEl) whatEl.textContent = isMusicVideo ? '' : detailsText(data);
+    fitPoster(); // the stack above may have changed height
     if (backdrop && isMusicVideo && data.poster) {
       const colorsFor = nowPlayingKey(data);
       computeArtColors(prox(data.poster)).then(colors => {
@@ -741,7 +757,10 @@
     const stage = document.getElementById('stage');
     const nowShowing = document.getElementById('nowShowing');
 
-    if (nowShowing) nowShowing.classList.remove('visible', 'music', 'paused', 'loading');
+    if (nowShowing) {
+      nowShowing.classList.remove('visible', 'music', 'paused', 'loading');
+      nowShowing.style.removeProperty('--movie-accent');
+    }
     if (stage) stage.style.display = 'block';
     currentMode = 'rotation';
     currentItemKey = null;
@@ -1101,7 +1120,30 @@
   function renderProgress() {
     const bar = document.getElementById('nowShowingProgressBar');
     if (bar && playback) bar.style.width = `${progressPercent()}%`;
+    renderEndsAt();
     updatePopup();
+  }
+
+  // ---- the details line under the movie/TV bar ----
+  // What's on ("S2 · E9 · Wax Patrol", or "Ghosted · 2023") and when it ends at the current
+  // position. A pause pushes the end time out, so it's recomputed on every progress tick.
+  function detailsText(data) {
+    const ep = data.mediaType === 'episode' && /^.* - S(\S+?)E(\S+?) - (.*)$/.exec(data.title || '');
+    if (ep) return `S${ep[1]} · E${ep[2]} · ${ep[3]}`;
+    return [data.title, data.year].filter(Boolean).join(' · ');
+  }
+
+  function endsAtText(now, remainingMs) {
+    if (!(remainingMs > 0)) return '';
+    const end = new Date(now + remainingMs);
+    return 'Ends ' + end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function renderEndsAt() {
+    const el = document.getElementById('nowShowingEnds');
+    if (!el) return;
+    const text = playback && playback.duration ? endsAtText(Date.now(), playback.duration - positionMs()) : '';
+    if (el.textContent !== text) el.textContent = text;
   }
 
   // ---- fun-fact bubbles (music layout, Pop-Up Video style) ----
@@ -1214,6 +1256,41 @@
   }
 
   // Centre the pause badge on the art, wherever the current layout put it.
+  // Movies and TV: the poster always spans the screen's width (Dan, 2026-09-30: "nothing we do
+  // should make those [black side bars] come back"). When the stack leaves it a box a little
+  // shorter than the poster, it fills the box and loses a sliver top and bottom instead.
+  // A very different shape (an episode frame, the last-resort artwork) is still drawn whole.
+  const POSTER_FILL_MAX_CROP = 0.1;
+
+  // The share of the poster's height cover would cut off, if filling is the right call
+  function posterFillCrop(naturalW, naturalH, boxW, boxH) {
+    if (!naturalW || !naturalH || !boxW || !boxH) return 0;
+    const crop = 1 - (naturalW / naturalH) / (boxW / boxH);
+    return crop > 0 && crop <= POSTER_FILL_MAX_CROP ? crop : 0;
+  }
+
+  function fitPoster() {
+    const poster = document.getElementById('nowShowingPoster');
+    const nowShowing = document.getElementById('nowShowing');
+    if (!poster || !nowShowing) return;
+    requestAnimationFrame(() => {
+      const fill = !nowShowing.classList.contains('music') &&
+        posterFillCrop(poster.naturalWidth, poster.naturalHeight, poster.clientWidth, poster.clientHeight) > 0;
+      poster.classList.toggle('fill', fill);
+    });
+  }
+
+  // Any change to the poster's box refits it: the image loading, the marquee's font arriving and
+  // unwrapping the title, the details line, a resize (Astra pass 1 #1: a font that loaded after
+  // the poster left the bars on). Toggling .fill changes only object-fit, never the box.
+  function watchPosterBox() {
+    const poster = document.getElementById('nowShowingPoster');
+    if (!poster) return;
+    if (window.ResizeObserver) new ResizeObserver(fitPoster).observe(poster);
+    else window.addEventListener('resize', fitPoster);
+  }
+  watchPosterBox();
+
   function placePauseBadge() {
     const badge = document.getElementById('nowShowingPauseBadge');
     const poster = document.getElementById('nowShowingPoster');

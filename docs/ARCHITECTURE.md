@@ -194,10 +194,32 @@ Two things about `nowplaying` mode are worth knowing:
   wide, so the gaps are kept tight enough to leave it that height; with the old
   `3vw` margins and `2.5vw` gaps it was height-bound and drew 32 px of black down
   each side. The poster has a set width (`100vw`), so a small poster still scales
-  up to the edges. A taller poster, or a large `progressBarPadding`, makes it
-  height-bound again, with thin black bars at the sides. Each badge's box is the drawn badge, so the
+  up to the edges. Each badge's box is the drawn badge, so the
   space around the row is real. The rules are `.now-showing:not(.music)`, so music
   mode is unaffected.
+- **The poster always spans the width** (Dan, 2026-09-30: no black side bars, whatever
+  else changes).
+  - When the stack leaves the poster a box a little shorter than the poster, the box
+    stays 100vw wide and `fitPoster()` adds `.fill` (`object-fit: cover`). The poster then
+    loses a sliver top and bottom instead of drawing bars.
+  - It runs on the poster's load, after the details line changes, and on resize.
+  - The crop is capped at 10% (`POSTER_FILL_MAX_CROP`). Anything needing more, such as a
+    16:9 episode frame used as last-resort artwork, is still drawn whole.
+- **The marquee and bar take the poster's colour.** `computeArtColors()`, the music
+  screen's accent, picks the poster's vivid colour. That colour becomes `--movie-accent`
+  on `#nowShowing`, and the title (with its glow), the bar and the end time use it.
+  - The previous colour stays until the new one is known.
+  - A poster with no vivid colour, one that fails to load, or the way back to the
+    rotation clears it. The configured `nowShowingColor` / `progressBarColor` apply
+    then: `:root` holds `--movie-accent: initial`, so the `var()` fallbacks win.
+- **The details line** sits between the bar and the poster. It shows what's on
+  (`S2 · E9 · Wax Patrol` from the episode title, or `Ghosted · 2023`) and, at the
+  right, `Ends 11:47 PM`.
+  - The end time is recomputed on every progress tick from the local playback clock,
+    so a pause pushes it out.
+  - Negative margins tuck the line into the stack's gaps, so it costs the poster as
+    little height as possible.
+  - It is hidden in music mode.
 - The row's three badges (resolution, audio, rating) are drawn, not loaded:
   `videoBadge()`, `audioBadge()` and `ratingBadge()` in `app.js` turn the
   now-playing fields into a spec, and `badgeHtml()` renders it in the look of the
@@ -450,8 +472,8 @@ tests so a future change is deliberate.
 - **`hostname` gets persisted.** The proxy injects `hostname` on `GET`, and the
   settings page spreads the whole document back on `PUT`, so a stale hostname
   ends up in `config.json`. Harmless — `GET` always overwrites it.
-- **The marquee never shows the title.** `/api/now-playing` returns a formatted
-  `title` and `styles.css` has a `.now-showing-movie-title` rule, but nothing
-  renders it. Only the configured `nowShowingText` is displayed.
+- **The marquee never shows the title.** Only the configured `nowShowingText` is
+  displayed there. The title goes in the details line under the bar
+  (`detailsText()`), and the old `.now-showing-movie-title` rule is unused.
 - **No retry on boot.** If the proxy is not answering when Chromium loads the
   page, the kiosk shows the error screen until it is reloaded.

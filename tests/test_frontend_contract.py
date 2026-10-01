@@ -383,6 +383,117 @@ def test_badges_keep_the_shape_of_the_icons_they_replaced(source):
 
 
 # --------------------------------------------------------------------------
+# Movie/TV: poster colour, the details line, the poster always full width
+# --------------------------------------------------------------------------
+def _run_js(source, names, calls, prelude=""):
+    """Run named top-level-in-the-IIFE functions (and consts) from app.js in Node.
+    names: function or const names to lift; calls: JS expressions; returns their values."""
+    body = source(APP_JS)
+    parts = []
+    for name in names:
+        m = re.search(r"\n  (const %s = [^\n]*\n)" % re.escape(name), body) or \
+            re.search(r"\n  (function %s\(.*?\n  \}\n)" % re.escape(name), body, re.S)
+        assert m, "app.js has no " + name
+        parts.append(m.group(1))
+    script = prelude + "".join(parts) + "\nconsole.log(JSON.stringify([" + ",".join(calls) + "]));"
+    return json.loads(subprocess.run(["node"], input=script, capture_output=True, text=True,
+                                     check=True).stdout)
+
+
+@needs_node
+def test_the_details_line_names_the_episode_or_the_movie(source):
+    out = _run_js(source, ["detailsText"], [
+        "detailsText({mediaType: 'episode', title: 'Doom Patrol - S2E9 - Wax Patrol'})",
+        "detailsText({mediaType: 'episode', title: 'Show - S?E? - Pilot - Part 1'})",
+        "detailsText({mediaType: 'movie', title: 'Ghosted', year: 2023})",
+        "detailsText({mediaType: 'movie', title: 'Ghosted'})",
+        "detailsText({mediaType: 'episode', title: 'Odd Title'})",
+    ])
+    assert out == ["S2 · E9 · Wax Patrol", "S? · E? · Pilot - Part 1", "Ghosted · 2023", "Ghosted", "Odd Title"]
+
+
+@needs_node
+def test_the_end_time_counts_the_time_left(source):
+    out = _run_js(source, ["endsAtText"], [
+        "endsAtText(new Date(2026, 8, 30, 23, 0).getTime(), 47 * 60000)",
+        "endsAtText(Date.now(), 0)",
+        "endsAtText(Date.now(), -5)",
+        "endsAtText(Date.now(), NaN)",
+    ])
+    assert re.fullmatch(r"Ends 11:47\s?PM", out[0]), out[0]
+    assert out[1:] == ["", "", ""]
+    app_js = source(APP_JS)
+    # recomputed on every progress tick, so a pause pushes the end time out
+    assert re.search(r"function renderProgress\(\) \{(?:(?!\n  \}\n).)*renderEndsAt\(\);", app_js, re.S)
+
+
+@needs_node
+def test_the_poster_fills_the_width_when_the_crop_is_small(source):
+    """Dan, 2026-09-30: "nothing we do should make those [black side bars] come back". A 2:3
+    poster in a box a little shorter than it fills the box (cover); an episode frame (16:9)
+    or anything needing more than POSTER_FILL_MAX_CROP is still drawn whole."""
+    out = _run_js(source, ["POSTER_FILL_MAX_CROP", "posterFillCrop"], [
+        "posterFillCrop(1000, 1500, 1080, 1580)",   # 2:3, box 2.5% short: fill
+        "posterFillCrop(1000, 1500, 1080, 1620)",   # exactly fits: nothing to do
+        "posterFillCrop(1920, 1080, 1080, 1580)",   # a wide frame: never cropped
+        "posterFillCrop(1000, 1500, 1080, 1400)",   # 13% short: too much, drawn whole
+        "posterFillCrop(0, 0, 1080, 1580)",         # not loaded yet
+    ])
+    assert 0.02 < out[0] < 0.03
+    assert out[1:] == [0, 0, 0, 0]
+    css = source(STYLES_CSS)
+    assert re.search(r"\.now-showing:not\(\.music\) \.now-showing-poster\.fill \{\s*object-fit: cover;", css)
+    app_js = source(APP_JS)
+    assert "poster.onload = () => { placePauseBadge(); fitPoster(); };" in app_js
+
+
+@needs_node
+def test_the_poster_refits_when_its_box_changes_later(source):
+    """Astra pass 1 #1: on a cold load the fallback marquee font wrapped, the poster's box was
+    too short to fill, and when Bebas loaded and unwrapped it nothing refitted: bars stayed.
+    A ResizeObserver on the poster refits on any change to its box."""
+    prelude = """
+const box = { w: 1080, h: 1400 };
+const classes = new Set();
+const poster = { naturalWidth: 1000, naturalHeight: 1500,
+  get clientWidth() { return box.w; }, get clientHeight() { return box.h; },
+  classList: { toggle: (c, on) => on ? classes.add(c) : classes.delete(c) } };
+const nowShowing = { classList: { contains: () => false } };
+const document = { getElementById: id => ({ nowShowingPoster: poster, nowShowing })[id] || null };
+const requestAnimationFrame = f => f();
+let observed = null;
+class ResizeObserver { constructor(cb) { this.cb = cb; } observe(el) { observed = { el, cb: this.cb }; } }
+const window = { ResizeObserver, addEventListener() {} };
+"""
+    out = _run_js(source, ["POSTER_FILL_MAX_CROP", "posterFillCrop", "fitPoster", "watchPosterBox"], [
+        "(watchPosterBox(), observed !== null && observed.el === poster)",
+        "(fitPoster(), classes.has('fill'))",          # 13% short: drawn whole
+        "(box.h = 1580, observed.cb(), classes.has('fill'))",   # the title unwrapped: fill
+    ], prelude=prelude)
+    assert out == [True, False, True]
+
+
+def test_the_marquee_and_bar_take_the_posters_colour(source):
+    css = source(STYLES_CSS)
+    # `initial` in :root makes the var() fall back to the configured colours
+    assert "--movie-accent: initial;" in css
+    assert "color: var(--movie-accent, var(--now-showing-color));" in css
+    assert "background-color: var(--movie-accent, var(--progress-bar-color, #F4E88A));" in css
+    app_js = source(APP_JS)
+    assert "nowShowing.style.setProperty('--movie-accent', colors.accent);" in app_js
+    # back to the configured colours between items and on the way back to the rotation
+    assert app_js.count("nowShowing.style.removeProperty('--movie-accent');") >= 3
+
+
+def test_the_details_line_is_movie_and_tv_only(source):
+    css = source(STYLES_CSS)
+    assert re.search(r"(?m)^\.now-showing-details \{\s*display: none;", css)
+    assert re.search(r"\.now-showing:not\(\.music\) \.now-showing-details \{\s*display: flex;", css)
+    index = source(INDEX_HTML)
+    assert 'id="nowShowingWhat"' in index and 'id="nowShowingEnds"' in index
+
+
+# --------------------------------------------------------------------------
 # Fonts
 # --------------------------------------------------------------------------
 def test_every_specially_styled_font_is_offered_in_the_dropdown(source):
