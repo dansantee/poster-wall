@@ -1089,6 +1089,9 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   font-weight: 700;
   line-height: 1.25;
   box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.35);
+  /* A thin dark outline around the bubble and its tail, so a white bubble stays visible on
+     white album art (Dan, 2026-10-03, option B of four rendered) */
+  filter: drop-shadow(0 0 0.06em rgba(0, 0, 0, 0.9)) drop-shadow(0 0 0.06em rgba(0, 0, 0, 0.9));
   pointer-events: none;
 }
 

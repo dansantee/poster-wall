@@ -1152,6 +1152,14 @@ def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
         assert rule in css, rule
 
 
+def test_the_bubble_has_an_outline_so_it_shows_on_white_art(source):
+    """Dan, 2026-10-03: the white bubbles blended into white album art. A thin dark outline,
+    a drop-shadow filter so the tail is outlined too (option B of four rendered)."""
+    rule = re.search(r"(?m)^\.now-showing-popup \{([^}]*)\}", source(STYLES_CSS)).group(1)
+    assert "filter: drop-shadow(0 0 0.06em rgba(0, 0, 0, 0.9)) drop-shadow(0 0 0.06em rgba(0, 0, 0, 0.9));" in rule
+    assert "background: #fff;" in rule
+
+
 def test_the_flying_cover_is_not_forced_back_into_the_layout(source):
     """The fly is appended to #nowShowing, whose children get position: relative from a more
     specific rule; unless it's excluded, the fly lands in the flow and shoves the art down."""

@@ -6,7 +6,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-482 tests, a couple of seconds, no network, no Plex server, no browser.
+483 tests, a couple of seconds, no network, no Plex server, no browser.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_now_playing_api.py -v   # one file
@@ -44,7 +44,7 @@ So the suite has two halves:
 | `test_plex_events.py` | 50 | `plex_events.py`: the websocket client's framing, ping/pong, close, and overall (not per-read) handshake and receive deadlines; the monitor's trigger filtering, follow-up and safety refreshes, `offsetAt` rule, keepalive, poll fallback and reconnects, and per-queue-item up-next caching |
 | `test_restart_kiosk.py` | 10 | `/api/restart-kiosk`: the exact systemctl command, admin key, timeout and failure handling |
 | `test_setup_api.py` | 23 | First-run setup: `configured`/`ip` on `GET /api/config` and computed keys dropped on `PUT`; Plex sign-in (PIN create/check with one client id, expiry, servers owned first with addresses in try order), connect picking the first address where the picked server answers (its `machineIdentifier` checked), libraries, players, the admin key |
-| `test_frontend_contract.py` | 95 | Element ids, the setup screen (addresses, reload once configured) and Connect to Plex wiring (library role suggestions and a slow earlier server choice run in Node), transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
+| `test_frontend_contract.py` | 96 | Element ids, the setup screen (addresses, reload once configured) and Connect to Plex wiring (library role suggestions and a slow earlier server choice run in Node), transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
 | `test_deployment_contract.py` | 40 | Ports, systemd unit names, rotation flags, the CJK font package, the kiosk's cache clear at start, `SECRETS.md` labels, gitignore hygiene, `install.sh` (piped to bash cut off at every point of its last line, it never starts; clones this repo, parses, scripts committed executable) |
 
 ## Fixtures worth knowing

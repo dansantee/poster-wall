@@ -356,7 +356,9 @@ Two things about `nowplaying` mode are worth knowing:
   - **Fun-fact bubbles** (Pop-Up Video style). A music item's `facts` (a list
     of short strings; none means no bubbles) pop up over a corner of the art,
     alternating top-right and bottom-left, with a white balloon whose tail
-    points into the art and a "bloop" scale pop in and out. The first comes at
+    points into the art and a "bloop" scale pop in and out. A thin dark outline
+    (a `drop-shadow` filter, so the tail has it too) keeps the balloon visible on
+    white album art (2026-10-03). The first comes at
     15 s, then one per 35 s slot, each held for its reading time (3 s plus 12
     characters a second).
     - The slots cycle through the facts, and each fact shows up to twice
