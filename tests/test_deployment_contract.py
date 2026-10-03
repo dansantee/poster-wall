@@ -50,8 +50,11 @@ def test_web_port_agrees_everywhere(source):
     assert shell_var(source(SETUP_SH), "WEB_PORT") == WEB_PORT
     assert "http.server $WEB_PORT" in source(SETUP_SH)
     assert "http.server " + WEB_PORT in source(SYSTEMD_EXAMPLES)
-    # The kiosk error screen tells the user where the settings page lives.
-    assert ":" + WEB_PORT + "/settings.html" in source(APP_JS)
+    # The kiosk's setup and error screens tell the user where the settings page lives: the port
+    # the kiosk itself was served from, with the web port as the fallback.
+    app_js = source(APP_JS)
+    assert "const port = location.port || '" + WEB_PORT + "';" in app_js
+    assert ":${port}/settings.html" in app_js
 
 
 def test_the_kiosk_browser_opens_the_static_site(source):
@@ -274,3 +277,75 @@ def test_the_secrets_template_is_committed_but_holds_no_real_values(source):
 
 def test_the_venv_is_ignored(source):
     assert ".venv/" in source(GITIGNORE)
+
+
+# --------------------------------------------------------------------------
+# One-line install (install.sh)
+# --------------------------------------------------------------------------
+INSTALL_SH = "install.sh"
+
+
+def test_the_installer_is_safe_to_pipe_from_curl(source):
+    """curl ... | bash runs whatever arrives: everything is inside main(), and the call is a
+    { ... } block bash must read whole before running, so a cut-off download runs nothing."""
+    sh = source(INSTALL_SH)
+    assert sh.startswith("#!/usr/bin/env bash")
+    assert re.search(r"^main\(\) \{\n", sh, re.M)
+    assert sh.rstrip().endswith('{ main "$@"; }')
+    assert "  set -euo pipefail" in sh
+
+
+def _git_bash():
+    # On Windows a bare "bash" can be WSL's launcher stub (it fails with no distro): prefer Git's
+    import os
+    import shutil
+    git_bash = r"C:\Program Files\Git\bin\bash.exe"
+    return git_bash if os.name == "nt" and os.path.exists(git_bash) else shutil.which("bash")
+
+
+def test_a_cut_off_download_never_starts_the_installer(source):
+    """Astra pass 1 #5: with a bare `main "$@"` last line, a download cut off right after `main`
+    still ran the installer, without its options. Cut the script at every point from the end of
+    main() on, with main's body replaced by a marker, and pipe each to bash as curl would."""
+    bash = _git_bash()
+    if not bash:
+        pytest.skip("bash unavailable")
+    sh = source(INSTALL_SH).replace("\r\n", "\n")
+    body_start = sh.index("main() {\n") + len("main() {\n")
+    body_end = sh.index("\n}\n", body_start)
+    stub = sh[:body_start] + "  echo INSTALLER-RAN\n" + sh[body_end:]
+    tail_from = stub.index("\n}\n", body_start) + 1
+    ran = []
+    for cut in range(tail_from, len(stub) + 1):
+        r = subprocess.run([bash], input=stub[:cut], capture_output=True, text=True, timeout=20)
+        if "INSTALLER-RAN" in r.stdout:
+            ran.append(repr(stub[tail_from:cut]))
+    assert ran == [repr(stub[tail_from:])] or ran == [repr(stub[tail_from:].rstrip("\n")), repr(stub[tail_from:])], \
+        "a truncated download started the installer: " + ", ".join(ran)
+
+
+def test_the_installer_clones_this_repo_and_runs_setup_with_the_options(source):
+    sh = source(INSTALL_SH)
+    assert "https://github.com/dansantee/poster-wall.git" in sh
+    assert 'git -C "$dir" pull --ff-only' in sh          # re-runnable: updates an existing clone
+    assert 'bash ./setup.sh "$@" </dev/null' in sh        # setup must not read the piped script
+    assert 'if [[ "$(id -u)" -eq 0 ]]; then' in sh        # the wall's user, not root
+    assert "raw.githubusercontent.com/dansantee/poster-wall/main/install.sh | bash" in source("README.md")
+
+
+def test_the_installer_parses(repo_root):
+    bash = _git_bash()
+    if not bash:
+        pytest.skip("bash unavailable")
+    r = subprocess.run([bash, "-n", str(repo_root / INSTALL_SH)], capture_output=True, text=True, timeout=10)
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("path", [INSTALL_SH, SETUP_SH])
+def test_the_scripts_are_executable_in_git(repo_root, path):
+    try:
+        r = subprocess.run(["git", "-C", str(repo_root), "ls-files", "-s", path],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):  # pragma: no cover
+        pytest.skip("git unavailable")
+    assert r.stdout.startswith("100755 "), path + " should be committed executable: " + r.stdout

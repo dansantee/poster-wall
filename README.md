@@ -37,74 +37,45 @@ Full picture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## What you need
 
-- Raspberry Pi 5 (4GB) - this is what I've tested on, other models might work
-- Raspberry Pi OS Lite 64-bit (Bookworm)
-- SSH enabled and wifi/ethernet setup
+- A Raspberry Pi 5 (4GB is what it's tested on; other models may work)
+- A microSD card, and a display (it's built for a portrait TV)
 - A Plex server on the same network
 
-## Quick setup
+## Setup
 
-1. Flash Raspberry Pi OS Lite (64-bit) to your SD card
-2. In the imager's "Advanced options" set up:
-   - Hostname
-   - Username and password  
-   - WiFi credentials
-   - Locale
-   - Enable SSH
-3. Boot it up and SSH in
+1. **Flash the SD card.** In [Raspberry Pi Imager](https://www.raspberrypi.com/software/),
+   choose **Raspberry Pi OS Lite (64-bit)**. In its settings, set a hostname
+   (`poster-wall` is a good one), a username and password, your Wi-Fi, and turn on SSH.
+2. **Boot the Pi and connect to it:** `ssh <your-username>@poster-wall.local`
+3. **Install Poster Wall** with one command:
 
-## Installation
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/dansantee/poster-wall/main/install.sh | bash
+   ```
 
-Update the RPI:
+   It updates the Pi, installs everything and sets the wall up for a portrait screen.
+   For a landscape screen, add the rotation:
+   `curl -fsSL https://raw.githubusercontent.com/dansantee/poster-wall/main/install.sh | bash -s -- --rotate 0`
 
-```bash
-sudo apt-get update && \
-  sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
-  apt-get -y -o Dpkg::Options::="--force-confdef" \
-  -o Dpkg::Options::="--force-confnew" full-upgrade
-```
+4. **Reboot** (`sudo reboot`). The screen shows the address of the settings page.
+5. **Open that address** on a phone or computer, press **Sign in with Plex** and enter
+   the code at [plex.tv/link](https://plex.tv/link). Pick your server, choose what each
+   library is for (posters, music videos, or not shown), and press **Save Settings**. The
+   wall starts by itself.
+6. **Pick the TV to watch.** Start something playing on it, press **Find players** in the
+   settings, and **Add** it, then Save again. Playback on that TV switches the wall to
+   Now Showing.
 
-Install Git:
+The installer is safe to re-run; it updates the code and re-applies the setup. See
+[RASPBERRY-PI.md](docs/RASPBERRY-PI.md) for exactly what it changes and the options
+`setup.sh` takes (`--rotate`, `--mode`).
 
-```bash
-sudo apt install git -y
-```
+### Setting it up by hand
 
-Clone this repo:
-
-```bash
-git clone https://github.com/your-username/poster-wall.git
-cd poster-wall
-```
-
-Run the setup script (the `--rotate 90` is for portrait displays):
-
-```bash
-chmod +x setup.sh
-./setup.sh --rotate 90
-```
-
-It's idempotent — re-run it any time, including with a different `--rotate`
-value. See [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) for exactly what it changes.
-
-Once everything's running, go to `http://your-pi-hostname.local:8088/settings.html`
-to configure the display.
-
-## Getting your Plex token
-
-You need a Plex token to access your library. Here's how to get it:
-
-1. Open any movie or show in Plex and click the "..." → "Get Info"
-2. Click "View XML"
-3. Look at the URL for `X-Plex-Token=...` — that string is your token
-
-Your Plex URL will be like `http://192.168.1.100:32400` (use your actual Plex server IP).
-
-You'll also need the **section ID** of each library you want to show. Open
-`http://your-plex:32400/library/sections?X-Plex-Token=your-token` and read the
-`key` of each library.
-
-The token is stored in plain text in `proxy/config.json`, which is gitignored.
+The settings page also takes the Plex URL (like `http://192.168.1.100:32400`), a token and
+library section IDs directly. To find a token yourself: open any item in Plex, choose
+**Get Info → View XML**, and copy the `X-Plex-Token=` value from the address. The token is
+stored in plain text in `proxy/config.json`, which is gitignored.
 
 ## Features
 
@@ -194,7 +165,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-443 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
+480 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
 API's behaviour end to end, and — since the frontend has no build step or test
 runner — they also assert the string-level contracts that hold the project
 together: element ids matching the HTML, transition names matching the CSS,

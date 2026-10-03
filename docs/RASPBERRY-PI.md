@@ -4,8 +4,25 @@ Tested on a Raspberry Pi 5 (4 GB) with Raspberry Pi OS Lite 64-bit (Bookworm)
 and a portrait-mounted HDMI display. Other models are likely fine; nothing here
 is Pi 5 specific except the GPU-composited transitions being smooth.
 
-Install instructions are in [the README](../README.md#installation). This
-document is about what `setup.sh` actually does and how to operate the thing
+Install instructions are in [the README](../README.md#setup). In short, on a fresh
+Raspberry Pi OS Lite:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dansantee/poster-wall/main/install.sh | bash
+```
+
+`install.sh` updates the Pi (`apt full-upgrade`) and installs git. It clones the repo into
+`~/poster-wall` (or `git pull --ff-only` if it's there), then runs `setup.sh` with any options
+passed after `bash -s --`. It refuses to run as root and does nothing if the download is cut
+short: everything is in `main()`, and the last line calls it as a `{ main "$@"; }` block, which
+bash only runs once it has read all of it. `POSTER_WALL_REPO`, `POSTER_WALL_DIR` and
+`POSTER_WALL_BRANCH` override the defaults.
+
+After a reboot, an unconfigured wall shows its setup screen with the settings page's address
+(`http://<hostname>.local:8088/settings.html` and the IP). Signing in with Plex there and saving
+makes the wall load by itself; no kiosk restart is needed.
+
+This document is about what `setup.sh` actually does and how to operate the thing
 afterwards.
 
 ## What `setup.sh` does

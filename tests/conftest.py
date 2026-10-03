@@ -97,6 +97,10 @@ class FakePlex:
                 return response
         return self.default
 
+    def post(self, url, data=None, json=None, headers=None, timeout=None, **_kwargs):
+        """POSTs route the same way (plex.tv's PIN creation)."""
+        return self.get(url, params=data or json, headers=headers, timeout=timeout)
+
     # -- assertions helpers ------------------------------------------------
     @property
     def urls(self):
@@ -171,6 +175,7 @@ def plex(monkeypatch):
     """Install a FakePlex in place of the ``requests`` module app.py uses."""
     fake = FakePlex()
     monkeypatch.setattr(app_module.requests, "get", fake.get)
+    monkeypatch.setattr(app_module.requests, "post", fake.post)
     return fake
 
 

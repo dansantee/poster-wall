@@ -66,7 +66,7 @@ REQUIRED_SETTINGS_IDS = {
 }
 
 # Config keys the proxy supplies but the settings page must never write back.
-SERVER_OWNED_KEYS = {"hostname"}
+SERVER_OWNED_KEYS = {"hostname", "ip", "configured"}
 
 
 # --------------------------------------------------------------------------
@@ -385,18 +385,20 @@ def test_badges_keep_the_shape_of_the_icons_they_replaced(source):
 # --------------------------------------------------------------------------
 # Movie/TV: poster colour, the details line, the poster always full width
 # --------------------------------------------------------------------------
-def _run_js(source, names, calls, prelude="", setup=""):
+def _run_js(source, names, calls, prelude="", setup="", path=APP_JS):
     """Run named top-level-in-the-IIFE functions (and consts) from app.js in Node.
     names: function or const names to lift; calls: JS expressions; returns their values.
     prelude runs before the lifted code (mocks it uses), setup after it (data built with it)."""
-    body = source(APP_JS)
+    body = source(path)
     parts = []
     for name in names:
         m = re.search(r"\n  (const %s = [^\n]*\n)" % re.escape(name), body) or \
-            re.search(r"\n  (function %s\(.*?\n  \}\n)" % re.escape(name), body, re.S)
+            re.search(r"\n  ((?:async )?function %s\(.*?\n  \}\n)" % re.escape(name), body, re.S)
         assert m, "app.js has no " + name
         parts.append(m.group(1))
-    script = prelude + "".join(parts) + setup + "\nconsole.log(JSON.stringify([" + ",".join(calls) + "]));"
+    # Promise.all: a call may be async; plain values pass straight through
+    script = prelude + "".join(parts) + setup + \
+        "\nPromise.all([" + ",".join(calls) + "]).then(v => console.log(JSON.stringify(v)));"
     return json.loads(subprocess.run(["node"], input=script, capture_output=True, text=True,
                                      check=True).stdout)
 
@@ -573,6 +575,116 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     mark = re.search(r"(?m)^\.now-showing-mark \{([^}]*)\}", css).group(1)
     assert "width: 0.28vw;" in mark and "height: 100%;" in mark and "border-radius" not in mark
     assert 'id="nowShowingMarks"' in source(INDEX_HTML)
+
+
+@needs_node
+def test_the_setup_screen_names_addresses_a_phone_can_reach(source):
+    """Dan, 2026-10-02: simpler setup. A bare hostname ("poster-wall") doesn't resolve on most
+    networks; with .local it does over mDNS, and the IP address works everywhere."""
+    out = _run_js(source, ["settingsUrls"], [
+        "settingsUrls({hostname: 'poster-wall', ip: '192.168.1.119'})",
+        "settingsUrls({hostname: 'wall.example.lan', ip: ''})",
+        "settingsUrls({hostname: '<hostname>'})",
+        "settingsUrls(null)",
+    ], prelude="const location = { port: '8088' };")
+    assert out == [
+        ["http://poster-wall.local:8088/settings.html", "http://192.168.1.119:8088/settings.html"],
+        ["http://wall.example.lan:8088/settings.html"],
+        ["http://poster-wall.local:8088/settings.html"],
+        ["http://poster-wall.local:8088/settings.html"],
+    ]
+
+
+def test_an_unconfigured_wall_shows_the_setup_screen_and_reloads_when_set_up(source):
+    app_js = source(APP_JS)
+    assert "configured:    j.configured    !== false," in app_js
+    assert "if (!cfg.configured || previewMode === 'setup') {" in app_js
+    assert "showSetup(cfg, !cfg.configured);" in app_js   # no reload loop for ?preview=setup
+    setup = re.search(r"function showSetup\(cfg, watch\) \{(.*?)\n  \}\n", app_js, re.S).group(1)
+    assert "if (!watch) return;" in setup
+    assert "(await r.json()).configured) { clearInterval(timer); location.reload(); }" in setup
+    assert "escapeHtml(first)" in setup
+    css = source(STYLES_CSS)
+    for cls in (".setup-screen {", ".setup-url {", ".setup-title {"):
+        assert cls in css
+
+
+@needs_node
+def test_a_first_setup_suggests_a_role_for_each_library(source):
+    """An "Other Videos" library (Plex's none agent; how music videos are usually kept) reports
+    type movie too: measured on Dan's server, 2026-10-02. It mustn't land in the poster rotation."""
+    out = _run_js(source, ["freshLibraryRole"], [
+        "freshLibraryRole({title: 'Movies', type: 'movie', agent: 'tv.plex.agents.movie'})",
+        "freshLibraryRole({title: 'TV Shows', type: 'show', agent: 'tv.plex.agents.series'})",
+        "freshLibraryRole({title: 'Music Videos', type: 'movie', agent: 'com.plexapp.agents.none'})",
+        "freshLibraryRole({title: 'Home Videos', type: 'movie', agent: 'com.plexapp.agents.none'})",
+        "freshLibraryRole({title: 'Music', type: 'artist', agent: 'tv.plex.agents.music'})",
+        "freshLibraryRole({title: 'Photos', type: 'photo', agent: 'com.plexapp.agents.none'})",
+    ], path=SETTINGS_JS)
+    assert out == ["posters", "posters", "music", "off", "off", "off"]
+    # Suggestions only on a first setup: keyed off nothing ever saved, not the section field,
+    # which the page fills with the old default "1" (seen in a render, 2026-10-02)
+    settings_js = source(SETTINGS_JS)
+    assert "librariesChosen = cfg.sectionId !== undefined || cfg.musicVideoSectionId !== undefined;" in settings_js
+    assert "const fresh = !librariesChosen;" in settings_js
+    # Astra pass 1 #1: on a first setup the suggestion wins over the field's default "1"
+    assert "const role = fresh ? freshLibraryRole(lib)" in settings_js
+    # Astra pass 1 #2: "Not shown" everywhere saves no poster libraries, not section "1"
+    assert settings_js.count("const sections = (el('sectionId').value || '').split(',')") == 2
+    assert "(el('sectionId').value || '1')" not in settings_js
+    # Astra pass 2: and the kiosk then skips the rotation instead of failing before the
+    # now-playing monitor starts (fetchItems throws on an empty result)
+    app_js = source(APP_JS)
+    assert "const items = cfg.sectionId.length ? await fetchItems(cfg) : [];" in app_js
+    assert re.search(r"function startRotation\(cfg, list\)\{\n    if \(!list\.length\) return;", app_js)
+    assert "sectionId:     Array.isArray(j.sectionId) ? j.sectionId : [j.sectionId || '1']," in app_js
+
+
+@needs_node
+def test_a_slow_earlier_server_choice_cannot_overwrite_a_newer_one(source):
+    """Astra pass 1 #3: connect to slow server A, then pick B; when A answered it replaced B's
+    URL and token. Each choice takes a number; an answer for an older one is dropped."""
+    prelude = """
+const fields = { plexUrl: { value: '' }, plexToken: { value: '' }, plexServer: { value: '0' } };
+const status = { textContent: '' };
+const el = id => fields[id] || status;
+const say = (id, text) => { status.textContent = text; };
+const setupHeaders = h => h || {};
+let serverGen = 0;
+let plexServers = [{ name: 'A', token: 'tok-a', candidates: ['http://a'], id: 'a' },
+                   { name: 'B', token: 'tok-b', candidates: ['http://b'], id: 'b' }];
+const pending = {};
+const setupFetch = (path, opts) => new Promise(res => { pending[JSON.parse(opts.body).machineId] = res; });
+const loaded = [];
+async function loadLibraries(gen) { loaded.push(gen); }
+"""
+    out = _run_js(source, ["useServer"], [
+        """(async () => {
+          const a = useServer();                       // A: slow
+          fields.plexServer.value = '1';
+          const b = useServer();                       // B: picked after
+          pending.b({ plexUrl: 'http://b' }); await b;
+          pending.a({ plexUrl: 'http://a' }); await a; // A answers last
+          return { url: fields.plexUrl.value, token: fields.plexToken.value, loaded };
+        })()""",
+    ], prelude=prelude, path=SETTINGS_JS)
+    assert out == [{"url": "http://b", "token": "tok-b", "loaded": [2]}]
+
+
+def test_the_settings_page_wires_up_plex_sign_in(source):
+    settings_js, html = source(SETTINGS_JS), source(SETTINGS_HTML)
+    for path in ("'/api/plex/pin'", "`/api/plex/pin/${encodeURIComponent(pin.id)}`", "'/api/plex/connect'",
+                 "'/api/plex/libraries'", "'/api/plex/players'"):
+        assert path in settings_js
+    for el_id in ("btnPlexSignIn", "plexPinCode", "plexLinkUrl", "plexServer", "btnPlexUseServer",
+                  "plexLibraryList", "btnFindPlayers", "playersList"):
+        assert f'id="{el_id}"' in html
+    # the choices land in the fields Save Settings already reads
+    assert "el('sectionId').value = picked('posters').join(', ');" in settings_js
+    assert "el('musicVideoSectionId').value = picked('music').join(', ');" in settings_js
+    # Plex text goes in with textContent, never innerHTML
+    assert "name.textContent = lib.title;" in settings_js
+    assert "opt.textContent = s.owned ? s.name : `${s.name} (shared with you)`;" in settings_js
 
 
 def test_the_details_line_is_movie_and_tv_only(source):

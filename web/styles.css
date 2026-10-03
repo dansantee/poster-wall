@@ -340,6 +340,92 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   filter: brightness(var(--poster-dim-brightness, 0.5));
 }
 
+/* Settings page: Connect to Plex */
+.plex-step {
+  margin-top: 14px;
+}
+
+.plex-step a {
+  color: var(--accent);
+}
+
+.plex-pin {
+  margin: 8px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--now-showing-color);
+}
+
+.plex-library,
+.plex-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.plex-library select {
+  width: auto;
+}
+
+/* First-run setup screen (app.js showSetup): where to finish setting up, readable across a room */
+.setup-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vh;
+  padding: 0 7vw;
+  background: #000;
+  color: #e6e9ef;
+  text-align: center;
+  font-family: 'League Spartan', system-ui, sans-serif;
+}
+
+.setup-title {
+  font-family: 'Bebas Neue', 'League Spartan', sans-serif;
+  font-size: 16vw;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--now-showing-color);
+  text-shadow: 0 4px 20px color-mix(in srgb, var(--now-showing-color) 30%, transparent);
+}
+
+.setup-lead,
+.setup-steps {
+  font-size: 4vw;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(230, 233, 239, 0.8);
+}
+
+.setup-url {
+  font-size: 4.3vw;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;   /* a long hostname wraps, but only where it has to */
+  color: var(--now-showing-color);
+}
+
+.setup-url-alt {
+  font-size: 3.9vw;
+}
+
+.setup-or {
+  font-size: 3.4vw;
+  color: rgba(230, 233, 239, 0.55);
+}
+
+.setup-steps {
+  margin-top: 3vh;
+  font-size: 3.4vw;
+}
+
 /* Error display styles */
 .error-container {
   color: #ff6b6b;

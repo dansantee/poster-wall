@@ -158,6 +158,9 @@ def cfg_get():
     config = load_cfg() or {}  # Ensure we always have a dict
     # Always add hostname to config for client use
     config['hostname'] = socket.gethostname()
+    # For the first-run setup screen: the address to show, and whether Plex is set up yet
+    config['ip'] = lan_ip()
+    config['configured'] = is_configured(config)
     
     # Add default transition settings if not present
     config.setdefault('posterTransitions', False)
@@ -174,6 +177,9 @@ def cfg_put():
         cfg = request.get_json(force=True)
         if not isinstance(cfg, dict):
             return jsonify({"error":"invalid body"}), 400
+        # Computed on every GET; never stored (the settings page re-saves the whole document)
+        for key in COMPUTED_CFG_KEYS:
+            cfg.pop(key, None)
         # minimal normalization
         if 'plexUrl' in cfg and isinstance(cfg['plexUrl'], str) and cfg['plexUrl'] and not cfg['plexUrl'].startswith(('http://','https://')):
             cfg['plexUrl'] = 'http://' + cfg['plexUrl']
@@ -181,6 +187,194 @@ def cfg_put():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+# ---- First-run setup: Plex sign-in, servers, libraries, players ----
+# The settings page signs in with Plex's device-link flow (a 4-letter code entered at
+# plex.tv/link), picks a server and the libraries to show, and finds the players to watch,
+# so nobody has to dig a token out of XML or look up section IDs and IP addresses.
+COMPUTED_CFG_KEYS = ('hostname', 'ip', 'configured')
+PLEX_TV = 'https://plex.tv/api/v2'
+PLEX_LINK_URL = 'https://plex.tv/link'
+CONNECT_TIMEOUT = 3.0
+
+
+def is_configured(cfg):
+    """Plex is set up when there's a server URL and a token, from config or the environment."""
+    base = (os.environ.get('PLEX_URL', '') or cfg.get('plexUrl') or '').strip()
+    token = (SERVER_TOKEN or cfg.get('plexToken') or '').strip()
+    return bool(base and token)
+
+
+def lan_ip():
+    """This machine's LAN address (no packet is sent: connect() on UDP only picks a route)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(('192.0.2.1', 9))
+            return sock.getsockname()[0]
+    except OSError:
+        return ''
+
+
+def plex_client_id():
+    """A stable per-device id for plex.tv: the PIN must be polled with the id that created it,
+    and Plex lists the wall under it in the account's devices."""
+    try:
+        machine = pathlib.Path('/etc/machine-id').read_text().strip()
+    except OSError:
+        machine = ''
+    import hashlib
+    return 'poster-wall-' + hashlib.sha1((machine or socket.gethostname()).encode()).hexdigest()[:16]
+
+
+def plex_tv_headers(token=None):
+    h = dict(PLEX_HEADERS)
+    h['X-Plex-Client-Identifier'] = plex_client_id()
+    h['X-Plex-Device-Name'] = socket.gethostname()
+    if token:
+        h['X-Plex-Token'] = token
+    return h
+
+
+def admin_forbidden():
+    return bool(ADMIN_KEY) and request.headers.get('X-Admin-Key', '') != ADMIN_KEY
+
+
+def server_candidates(resource):
+    """A Plex server's addresses in the order to try from the wall: its LAN address over plain
+    http (what a manual setup uses), then the LAN https address, then remote, then Plex's relay."""
+    conns = resource.get('connections') or []
+    local = [c for c in conns if c.get('local') and not c.get('relay')]
+    remote = [c for c in conns if not c.get('local') and not c.get('relay')]
+    relay = [c for c in conns if c.get('relay')]
+    out = []
+    for c in local:
+        if c.get('address') and c.get('port') and not c.get('IPv6'):
+            out.append(f"http://{c['address']}:{c['port']}")
+    out += [c['uri'] for c in local + remote + relay if c.get('uri')]
+    seen = set()
+    return [u for u in out if not (u in seen or seen.add(u))]
+
+
+@app.route('/api/plex/pin', methods=['POST', 'OPTIONS'])
+def plex_pin_create():
+    if request.method == 'OPTIONS': return ('', 204)
+    if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
+    try:
+        r = requests.post(f'{PLEX_TV}/pins', headers=plex_tv_headers(), data={'strong': 'false'}, timeout=TIMEOUT)
+        if not r.ok:
+            return jsonify({"error": f"plex.tv answered {r.status_code}"}), 502
+        pin = r.json()
+        return jsonify({"id": pin.get('id'), "code": pin.get('code'), "linkUrl": PLEX_LINK_URL,
+                        "expiresIn": pin.get('expiresIn')})
+    except Exception as e:
+        return jsonify({"error": f"Could not reach plex.tv: {e}"}), 502
+
+
+@app.route('/api/plex/pin/<int:pin_id>', methods=['GET', 'OPTIONS'])
+def plex_pin_check(pin_id):
+    """Not linked yet → {linked: false}. Linked → the account's servers, the ones it owns first,
+    each with its own access token and the addresses to try."""
+    if request.method == 'OPTIONS': return ('', 204)
+    if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
+    try:
+        r = requests.get(f'{PLEX_TV}/pins/{pin_id}', headers=plex_tv_headers(), timeout=TIMEOUT)
+        if r.status_code == 404:
+            return jsonify({"linked": False, "expired": True})
+        if not r.ok:
+            return jsonify({"error": f"plex.tv answered {r.status_code}"}), 502
+        account_token = r.json().get('authToken')
+        if not account_token:
+            return jsonify({"linked": False})
+        res = requests.get(f'{PLEX_TV}/resources', params={'includeHttps': 1, 'includeRelay': 1},
+                           headers=plex_tv_headers(account_token), timeout=TIMEOUT)
+        if not res.ok:
+            return jsonify({"error": f"plex.tv answered {res.status_code} for the server list"}), 502
+        servers = [
+            {"name": d.get('name') or 'Plex Media Server', "owned": bool(d.get('owned')),
+             "id": d.get('clientIdentifier') or '',
+             "token": d.get('accessToken') or account_token, "candidates": server_candidates(d)}
+            for d in res.json() if 'server' in str(d.get('provides', '')).split(',')
+        ]
+        servers.sort(key=lambda s: not s['owned'])
+        return jsonify({"linked": True, "servers": servers})
+    except Exception as e:
+        return jsonify({"error": f"Could not reach plex.tv: {e}"}), 502
+
+
+@app.route('/api/plex/connect', methods=['POST', 'OPTIONS'])
+def plex_connect():
+    """The first of a server's addresses that answers from here as that server: body
+    {token, candidates, machineId}. With machineId (plex.tv's clientIdentifier for it), the
+    address only counts if /identity there reports the same machineIdentifier: a shared server's
+    private address can belong to something else on the wall's LAN (Astra pass 1)."""
+    if request.method == 'OPTIONS': return ('', 204)
+    if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
+    body = request.get_json(silent=True) or {}
+    token = str(body.get('token') or '')
+    machine_id = str(body.get('machineId') or '')
+    tried = []
+    for uri in [str(u) for u in (body.get('candidates') or [])][:8]:
+        try:
+            r = requests.get(f"{uri.rstrip('/')}/identity", params={'X-Plex-Token': token},
+                             headers=PLEX_HEADERS, timeout=CONNECT_TIMEOUT, verify=True)
+            if not r.ok:
+                tried.append(f"{uri}: HTTP {r.status_code}")
+                continue
+            try:
+                found = (r.json().get('MediaContainer') or {}).get('machineIdentifier', '')
+            except ValueError:
+                found = ''
+            if machine_id and found != machine_id:
+                tried.append(f"{uri}: a different server" if found else f"{uri}: not a Plex server")
+                continue
+            return jsonify({"plexUrl": uri.rstrip('/')})
+        except Exception as e:
+            tried.append(f"{uri}: {type(e).__name__}")
+    return jsonify({"error": "None of the server's addresses answered from the wall", "tried": tried}), 502
+
+
+@app.route('/api/plex/libraries', methods=['GET', 'OPTIONS'])
+def plex_libraries():
+    """The server's libraries ({key, title, type}), for the settings page's library picker."""
+    if request.method == 'OPTIONS': return ('', 204)
+    if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
+    try:
+        base, token = resolve_base(request), token_from(request)
+        r = requests.get(f'{base}/library/sections', params={'X-Plex-Token': token}, headers=PLEX_HEADERS,
+                         timeout=TIMEOUT, verify=not insecure_from(request))
+        if not r.ok:
+            return jsonify({"error": f"Plex answered {r.status_code}"}), 502
+        dirs = (r.json().get('MediaContainer') or {}).get('Directory') or []
+        # agent: an "Other Videos" library (agent ...none) reports type movie too
+        return jsonify({"libraries": [{"key": str(d.get('key')), "title": d.get('title', ''), "type": d.get('type', ''),
+                                       "agent": d.get('agent', '')}
+                                      for d in dirs]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route('/api/plex/players', methods=['GET', 'OPTIONS'])
+def plex_players():
+    """Players with something playing now ({title, address, product, playing}), so the settings
+    page can add a TV to the monitored devices without looking up its IP address."""
+    if request.method == 'OPTIONS': return ('', 204)
+    if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
+    try:
+        base, token = resolve_base(request), token_from(request)
+        r = requests.get(f'{base}/status/sessions', params={'X-Plex-Token': token}, headers=PLEX_HEADERS,
+                         timeout=TIMEOUT, verify=not insecure_from(request))
+        if not r.ok:
+            return jsonify({"error": f"Plex answered {r.status_code}"}), 502
+        players = []
+        for m in (r.json().get('MediaContainer') or {}).get('Metadata') or []:
+            pl = m.get('Player') or {}
+            if pl.get('address'):
+                players.append({"title": pl.get('title', ''), "address": pl['address'],
+                                "product": pl.get('product', ''), "playing": m.get('title', '')})
+        return jsonify({"players": players})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
 
 # ---- Movies (paged) ----
 @app.route('/api/movies', methods=['GET','OPTIONS'])

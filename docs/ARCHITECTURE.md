@@ -62,6 +62,8 @@ The proxy exists for four reasons, and each one is load-bearing:
 init()
  ├─ GET /api/config ................ loadCfg(), normalises + defaults every key
  ├─ applyFontSettings(cfg) ......... writes CSS custom properties on :root
+ ├─ if !cfg.configured ............. showSetup(): the settings page's address; polls
+ │                                   /api/config every 5 s and reloads once set up
  ├─ if ?preview=nowplaying|musicvideo  render a fake session and stop
  ├─ GET /api/movies?start=&size=500  fetchItems(), pages until a short page
  ├─ startRotation(cfg, items) ...... shuffles again client-side, primes poster A,
@@ -490,11 +492,10 @@ tests so a future change is deliberate.
 - **The settings page cannot send an admin key.** `settings.js` looks for an
   `adminKey` input that `settings.html` does not contain. If `PW_ADMIN_KEY` is
   set on the proxy, saving from the UI fails with 403.
-- **`hostname` gets persisted.** The proxy injects `hostname` on `GET`, and the
-  settings page spreads the whole document back on `PUT`, so a stale hostname
-  ends up in `config.json`. Harmless — `GET` always overwrites it.
 - **The marquee never shows the title.** Only the configured `nowShowingText` is
   displayed there. The title goes in the details line under the bar
   (`detailsText()`), and the old `.now-showing-movie-title` rule is unused.
 - **No retry on boot.** If the proxy is not answering when Chromium loads the
-  page, the kiosk shows the error screen until it is reloaded.
+  page, the kiosk shows the error screen until it is reloaded. (An unconfigured
+  wall is different: its setup screen polls `/api/config` every 5 s and reloads
+  once Plex is set up.)

@@ -6,7 +6,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-443 tests, a couple of seconds, no network, no Plex server, no browser.
+480 tests, a couple of seconds, no network, no Plex server, no browser.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_now_playing_api.py -v   # one file
@@ -36,15 +36,16 @@ So the suite has two halves:
 | File | Tests | Covers |
 | --- | --- | --- |
 | `conftest.py` | — | Fake Plex server, isolated config file, source-reading fixtures |
-| `test_health.py` | 13 | `/api/ping`, `/api/build-info`, CORS headers, the full route list |
+| `test_health.py` | 17 | `/api/ping`, `/api/build-info`, CORS headers, the full route list |
 | `test_config_api.py` | 20 | `GET`/`PUT` `/api/config`: defaults, round-trip, replace-not-merge, URL normalisation, admin key |
 | `test_movies_api.py` | 30 | `/api/movies`: URL/token resolution, multi-section fan-out, type + artwork filtering, paging and clamps, poster URL shape |
 | `test_poster_api.py` | 23 | `/api/poster`: the transcode URL, streaming, caching, TLS flags, 502 on upstream failure |
 | `test_now_playing_api.py` | 174 | `/api/now-playing`: device whitelist, library whitelist, media-type filter, music videos, progress maths, `state`/`offsetAt`/`playerId`, audio-channel labels and profile, HDR detection, the whole episode-artwork fallback chain, the monitor cache and its direct fallback, `monitor_queue()` (up next), `short_title()`, `display_title()`, and fun facts from the Plex summary (background fetch, cache key, TTL) |
 | `test_plex_events.py` | 50 | `plex_events.py`: the websocket client's framing, ping/pong, close, and overall (not per-read) handshake and receive deadlines; the monitor's trigger filtering, follow-up and safety refreshes, `offsetAt` rule, keepalive, poll fallback and reconnects, and per-queue-item up-next caching |
 | `test_restart_kiosk.py` | 10 | `/api/restart-kiosk`: the exact systemctl command, admin key, timeout and failure handling |
-| `test_frontend_contract.py` | 89 | Element ids, transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
-| `test_deployment_contract.py` | 34 | Ports, systemd unit names, rotation flags, the CJK font package, the kiosk's cache clear at start, `SECRETS.md` labels, gitignore hygiene |
+| `test_setup_api.py` | 22 | First-run setup: `configured`/`ip` on `GET /api/config` and computed keys dropped on `PUT`; Plex sign-in (PIN create/check with one client id, expiry, servers owned first with addresses in try order), connect picking the first address where the picked server answers (its `machineIdentifier` checked), libraries, players, the admin key |
+| `test_frontend_contract.py` | 94 | Element ids, the setup screen (addresses, reload once configured) and Connect to Plex wiring (library role suggestions and a slow earlier server choice run in Node), transitions ↔ CSS, custom properties ↔ `:root`, the metadata badges (run in Node: what each format and rating reads, escaping, every class styled) and their font files, fonts, config-key coverage, shared defaults, the song-change transition wiring, fun-fact bubbles, the movie/TV and music layout spacing, the song line's `displayTitle` |
+| `test_deployment_contract.py` | 40 | Ports, systemd unit names, rotation flags, the CJK font package, the kiosk's cache clear at start, `SECRETS.md` labels, gitignore hygiene, `install.sh` (piped to bash cut off at every point of its last line, it never starts; clones this repo, parses, scripts committed executable) |
 
 ## Fixtures worth knowing
 
@@ -95,7 +96,8 @@ underlying issue, the test failing is the reminder to update the docs too.
 - `test_unused_css_transitions_are_flagged` — `blur-transition` is styled but
   unreachable from the UI.
 - `test_the_settings_page_resaves_the_whole_config_document` — the `{ ...cfg }`
-  spread is why `hostname` ends up persisted in `config.json`.
+  spread sends the proxy's computed keys (`hostname`, `ip`, `configured`) back;
+  `PUT /api/config` drops them.
 - `test_both_save_paths_write_the_same_keys` — `settings.js` duplicates its save
   payload; this keeps the two copies honest until they are factored out.
 

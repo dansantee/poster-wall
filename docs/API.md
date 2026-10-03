@@ -88,9 +88,11 @@ direct deploy the commit is unchanged but `dirty` is `true`.
 
 ## `GET /api/config`
 
-Returns `config.json` as-is, plus two things the file may not contain:
+Returns `config.json` as-is, plus things the file may not contain:
 
-- `hostname` — always injected
+- `hostname`, `ip` and `configured`: always computed. `ip` is the Pi's LAN address.
+  `configured` is true when a Plex URL and a token are set, in the file or the environment.
+  The kiosk shows its first-run setup screen while it's false.
 - `posterTransitions` (default `false`) and `transitionTypes` (default
   `["crossfade"]`) — filled in only if absent
 
@@ -112,8 +114,9 @@ Body: a JSON object. Replaces the file wholesale.
 | `400 {"error": "…"}` | Body is not parseable JSON |
 | `403 {"error": "forbidden"}` | `PW_ADMIN_KEY` is set and `X-Admin-Key` does not match |
 
-The only normalisation applied is on `plexUrl`: a non-empty value without a
-scheme gets `http://`. Unknown keys are preserved verbatim, which is what keeps
+The computed keys (`hostname`, `ip`, `configured`) are dropped before saving, since the
+settings page re-sends the whole document it loaded. The only other normalisation is on
+`plexUrl`: a non-empty value without a scheme gets `http://`. Unknown keys are preserved verbatim, which is what keeps
 old installs working across upgrades.
 
 Because this is a replace and not a merge, a client must send the whole
@@ -332,6 +335,61 @@ usually a video frame:
 
 The extra lookup is `GET {base}/library/metadata/{parentRatingKey}`. If it fails
 the fallbacks still apply; movies skip it entirely.
+
+---
+
+## Setup: Plex sign-in, servers, libraries, players
+
+The settings page's **Connect to Plex** card uses these. Each is gated by the admin key like
+`PUT /api/config`, because they hand out Plex tokens. All answer `502 {"error": …}` when
+plex.tv or the Plex server can't be reached.
+
+### `POST /api/plex/pin`
+
+Starts Plex's device-link sign-in: creates a PIN at plex.tv and returns
+`{"id": 1113127683, "code": "K7QZ", "linkUrl": "https://plex.tv/link", "expiresIn": 900}`.
+The user enters `code` at `linkUrl`. plex.tv calls carry a per-device
+`X-Plex-Client-Identifier` (`poster-wall-` + a hash of `/etc/machine-id`), because a PIN must be
+checked with the id that created it.
+
+### `GET /api/plex/pin/<id>`
+
+| Response | When |
+| --- | --- |
+| `{"linked": false}` | Not entered yet; poll again (the page polls every 2 s, for up to 15 min) |
+| `{"linked": false, "expired": true}` | plex.tv no longer knows the PIN |
+| `{"linked": true, "servers": [...]}` | Signed in |
+
+Each server is `{name, owned, id, token, candidates}`, the account's own servers first. `id`
+is plex.tv's `clientIdentifier` for it, which is the server's own `machineIdentifier`. `token` is
+the server's own access token (a shared server's differs from the account's). `candidates` are
+its addresses in the order to try from the wall: the LAN address over plain http
+(`http://192.168.1.3:32400`), the LAN https (`plex.direct`) address, remote, then Plex's relay.
+
+### `POST /api/plex/connect`
+
+Body `{"token": …, "candidates": [...], "machineId": …}` (up to 8 candidates). Calls
+`<candidate>/identity` on each, 3 s apiece, and returns the first where that server answers:
+`{"plexUrl": "http://192.168.1.3:32400"}`. With `machineId`, an address counts only if its
+`/identity` reports that `machineIdentifier`, because a shared server's private address can
+belong to something else on the wall's own network. If none does:
+`502 {"error": …, "tried": ["http://a:32400: HTTP 401", "http://b:32400: a different server",
+"http://c:32400: not a Plex server"]}`.
+
+### `GET /api/plex/libraries`
+
+The server's libraries, `{"libraries": [{"key": "1", "title": "Movies", "type": "movie",
+"agent": "tv.plex.agents.movie"}, …]}`. Plex URL and token are resolved like `/api/movies`
+(the page sends the fields it's filling in as `X-Plex-Url` / `X-Plex-Token`). `agent` tells an
+"Other Videos" library (`com.plexapp.agents.none`, where music videos usually live) from
+movies: both report type `movie`.
+
+### `GET /api/plex/players`
+
+Players with something playing right now, from `/status/sessions`:
+`{"players": [{"title": "XBOX", "address": "192.168.1.100", "product": "Plex for Xbox",
+"playing": "Wax Patrol"}]}`. Sessions without a player address are left out. The page adds an
+address to the monitored devices (`plexDevices`).
 
 ---
 

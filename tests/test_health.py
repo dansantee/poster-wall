@@ -18,6 +18,11 @@ EXPECTED_ROUTES = {
     "/api/poster",
     "/api/now-playing",
     "/api/restart-kiosk",
+    "/api/plex/pin",
+    "/api/plex/pin/<int:pin_id>",
+    "/api/plex/connect",
+    "/api/plex/libraries",
+    "/api/plex/players",
     "/debug/routes",
     "/static/<path:filename>",
 }
@@ -30,6 +35,10 @@ PREFLIGHTED = [
     "/api/movies",
     "/api/poster",
     "/api/now-playing",
+    "/api/plex/pin",
+    "/api/plex/connect",
+    "/api/plex/libraries",
+    "/api/plex/players",
 ]
 
 

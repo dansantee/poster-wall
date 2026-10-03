@@ -14,8 +14,40 @@
   function proxyBase(){ return `${location.protocol}//${location.hostname}:8811`; }
 
   // Display error message to user
-  function showError(message, hostname = 'poster-wall.local') {
-    const settingsUrl = `http://${hostname}:8088/settings.html`;
+  // Where the settings page is, as a phone on the LAN can reach it: the hostname with .local
+  // (mDNS; a bare "poster-wall" doesn't resolve on most networks) and the IP address.
+  function settingsUrls(cfg) {
+    const port = location.port || '8088';
+    const name = cfg && cfg.hostname && cfg.hostname !== '<hostname>' ? String(cfg.hostname) : 'poster-wall';
+    const host = name.includes('.') ? name : `${name}.local`;
+    return [host, cfg && cfg.ip].filter(Boolean).map(h => `http://${h}:${port}/settings.html`);
+  }
+
+  // First run: Plex isn't set up yet. Say where to finish setup, and reload once it's saved, so
+  // nobody has to restart the kiosk (Dan, 2026-10-02: make setup simple). `watch` is false for
+  // ?preview=setup on a configured wall, which would otherwise reload itself forever.
+  const SETUP_POLL_MS = 5000;
+  function showSetup(cfg, watch) {
+    const [first, ...rest] = settingsUrls(cfg);
+    document.body.innerHTML = `
+      <div class="setup-screen">
+        <div class="setup-title">Poster Wall</div>
+        <div class="setup-lead">To finish setting up, open this on a phone or computer on the same network:</div>
+        <div class="setup-url">${escapeHtml(first)}</div>
+        ${rest.map(u => `<div class="setup-or">or</div><div class="setup-url setup-url-alt">${escapeHtml(u)}</div>`).join('')}
+        <div class="setup-steps">Sign in with Plex, choose your libraries, and press Save.<br>This screen changes by itself.</div>
+      </div>`;
+    if (!watch) return;
+    const timer = setInterval(async () => {
+      try {
+        const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
+        if (r.ok && (await r.json()).configured) { clearInterval(timer); location.reload(); }
+      } catch { /* the proxy restarting; try again */ }
+    }, SETUP_POLL_MS);
+  }
+
+  function showError(message, cfg) {
+    const settingsUrl = settingsUrls(cfg).join(' or ');
     document.body.innerHTML = `
       <div class="error-container">
         <div class="error-message">
@@ -51,6 +83,8 @@
       plexInsecure:  !!j.plexInsecure,
       autoDim:       !!j.autoDim,
       hostname:      j.hostname      ?? '<hostname>',
+      ip:            j.ip            ?? '',
+      configured:    j.configured    !== false,   // false only when the proxy says Plex isn't set up
       nowShowingText:j.nowShowingText?? 'NOW SHOWING',
       nowShowingFont:j.nowShowingFont?? "'Bebas Neue', sans-serif",
       nowShowingFontSize:j.nowShowingFontSize?? 9,
@@ -1456,6 +1490,12 @@
       const cfg = await loadCfg();
       applyFontSettings(cfg);
 
+      // ?preview=setup shows the first-run screen on a configured wall
+      if (!cfg.configured || previewMode === 'setup') {
+        showSetup(cfg, !cfg.configured);
+        return;
+      }
+
       if (previewMode === 'nowplaying' || previewMode === 'musicvideo') {
         let previewItems = [];
         try {
@@ -1508,7 +1548,9 @@
         return;
       }
 
-      const items = await fetchItems(cfg);
+      // No poster libraries chosen (a music-videos-only wall): no rotation, and no "no movies"
+      // error before the now-playing monitor starts (Astra pass 2)
+      const items = cfg.sectionId.length ? await fetchItems(cfg) : [];
       startRotation(cfg, items);
 
       if (previewMode !== 'rotation' && cfg.plexDevices && cfg.plexDevices.length > 0) {
@@ -1516,18 +1558,15 @@
       }
     }catch(e){
       console.error(e);
-      // Try to get hostname from config if we managed to load it
-      let hostname = 'poster-wall.local';
+      // Try to get hostname and address from config if we managed to load it
+      let cfgForUrls = null;
       try {
         const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          hostname = j.hostname || hostname;
-        }
+        if (r.ok) cfgForUrls = await r.json();
       } catch (configError) {
-        // Use fallback hostname
+        // Use the fallback hostname
       }
-      showError(e.message || 'An unexpected error occurred. Please check the console for details.', hostname);
+      showError(e.message || 'An unexpected error occurred. Please check the console for details.', cfgForUrls);
     }
   })();
 })();

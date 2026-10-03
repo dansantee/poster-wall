@@ -18,6 +18,32 @@
     </nav>
   </header>
 
+  <section class="card" id="plexSetup">
+    <h2>Connect to Plex</h2>
+    <p class="muted">Sign in once and choose what to show. This fills in the Plex Connection and library fields below; press Save Settings when you're done.</p>
+    <div class="row">
+      <button id="btnPlexSignIn" class="btn" type="button">Sign in with Plex</button>
+    </div>
+    <div id="plexSignIn" class="plex-step" hidden>
+      <p>On any device, go to <a id="plexLinkUrl" href="https://plex.tv/link" target="_blank" rel="noopener">plex.tv/link</a> and enter:</p>
+      <div id="plexPinCode" class="plex-pin"></div>
+      <div id="plexSignInStatus" class="muted"></div>
+    </div>
+    <div id="plexServers" class="plex-step" hidden>
+      <label>Server
+        <select id="plexServer"></select>
+      </label>
+      <button id="btnPlexUseServer" class="btn" type="button">Use this server</button>
+      <div id="plexServerStatus" class="muted"></div>
+    </div>
+    <div id="plexLibraries" class="plex-step" hidden>
+      <h3>Libraries</h3>
+      <div id="plexLibraryList"></div>
+      <small>Posters: in the rotation, and shown as Now Playing. Music videos: album art, artist and song while one plays.</small>
+      <div id="plexLibraryHint" class="muted"></div>
+    </div>
+  </section>
+
   <section class="card">
     <h2>Build Status</h2>
     <div id="buildInfo" class="build-info muted">Loading build info...</div>
@@ -163,6 +189,11 @@
         <textarea id="plexDevices" rows="4" placeholder="192.168.1.100&#10;apple-tv.local&#10;roku-player&#10;nvidia-shield.home"></textarea>
         <small>Enter the IP addresses or hostnames of devices you want to monitor. Only content playing on these devices will trigger "Now Playing" mode.</small>
       </label>
+      <div class="row">
+        <button id="btnFindPlayers" class="btn" type="button">Find players</button>
+      </div>
+      <small>Start something playing on the TV first; its player shows up here to add.</small>
+      <div id="playersList"></div>
       <label class="inline" for="plexInsecure">
         <span>Allow Insecure Certificates</span>
         <input type="checkbox" id="plexInsecure" />

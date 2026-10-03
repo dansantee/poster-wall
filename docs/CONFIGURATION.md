@@ -48,7 +48,7 @@ that is what the **Restart Kiosk** button is for.
 | `plexUrl` | string | `""` | Base URL of the Plex server. Saved without a scheme, `http://` is added — by the settings page and again by the proxy on `PUT`. Overridden by the `PLEX_URL` environment variable. |
 | `plexToken` | string | `""` | Plex auth token, stored in plain text. Overridden by the `PLEX_TOKEN` environment variable. See [the README](../README.md#getting-your-plex-token) for how to find it. |
 | `plexInsecure` | boolean | `false` | Skip TLS certificate verification on every Plex call. Needed for self-signed certs; leave off for plain `http://`. |
-| `sectionId` | array of strings | `["1"]` | Plex library section IDs to include. Entered comma-separated in the UI. A bare string is still accepted for backward compatibility. Controls **both** the poster rotation and which libraries "Now Playing" reacts to. |
+| `sectionId` | array of strings | `["1"]` | Plex library section IDs to include. Entered comma-separated in the UI, or set by Connect to Plex's library picker. An empty field saves `[]` (no poster rotation, for example a music-videos-only wall); only a config that never had the key gets `["1"]`. A bare string is still accepted for backward compatibility. Controls **both** the poster rotation and which libraries "Now Playing" reacts to. |
 | `plexDevices` | array of strings | `[]` | IP addresses or hostnames whose playback triggers "Now Showing" mode. One per line in the UI. **Empty disables the feature entirely** — the proxy never even polls Plex. Matched case-insensitively against `Player.address`. |
 | `musicVideoSectionId` | array of strings | `[]` | Library section IDs whose playback uses the music-video layout (album art, song, artist, progress bar on a colour taken from the art; no marquee) instead of the movie marquee, plus an "Up next" row from the play queue and an accent colour picked from the art. Entered comma-separated in the UI; a bare value is accepted. Independent of `sectionId`: a music library does **not** need to be in `sectionId`, and should not be, or its video-frame thumbnails join the poster rotation. The music layout ignores the marquee font/colour and progress-bar colour settings. A `musicVideoText` key from the first version of this feature is now unused and harmless. |
 
@@ -114,7 +114,7 @@ Shown only in "Now Showing" mode, reflecting `viewOffset / duration`.
 
 | Key | Notes |
 | --- | --- |
-| `hostname` | Added by the proxy on every `GET /api/config`; the kiosk uses it to print the settings URL on its error screen. Never set it by hand. It does get written back into the file (see below), which is harmless. |
+| `hostname`, `ip`, `configured` | Computed by the proxy on every `GET /api/config`. The kiosk's setup and error screens print the settings URL from `hostname` (with `.local`) and `ip`. `configured` is false until a Plex URL and token are set, which shows the setup screen. `PUT` drops them, so they are never stored. |
 | `transitionType` | Singular. A pre-multi-select leftover; nothing reads it. |
 | `excludedLibraries` | An abandoned blacklist approach; library selection is now a whitelist via `sectionId`. Nothing reads it. |
 

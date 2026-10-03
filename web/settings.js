@@ -2,6 +2,8 @@
   // ---------- helpers ----------
   const has = id => !!document.getElementById(id);
   const el  = id => document.getElementById(id);
+  // Whether libraries were ever saved; set in init, read by the Connect to Plex library picker
+  let librariesChosen = true;
 
   // Always talk to the proxy running on the same host (port 8811)
   function proxyBase() {
@@ -56,6 +58,9 @@
       }
 
       // populate (null-safe; fields may be removed from HTML)
+      // Libraries never chosen: the library picker suggests a role for each (the field's '1'
+      // below is only the old default, not a choice)
+      librariesChosen = cfg.sectionId !== undefined || cfg.musicVideoSectionId !== undefined;
       if (has('sectionId'))   {
         // Handle both string and array formats for backward compatibility
         const sections = cfg.sectionId;
@@ -107,12 +112,14 @@
       if (has('adminKey'))    el('adminKey').value     = ''; // never persist the key in JSON
 
       bindHandlers(cfg);
+      bindPlexSetup();
     } catch (e) {
       // minimal inline error
       const pre = document.getElementById('testOut');
       if (pre) pre.textContent = `Failed to load server config: ${e}`;
       console.error(e);
       bindHandlers({}); // still bind so user can try saving
+      bindPlexSetup();
     }
   })();
 
@@ -123,7 +130,7 @@
         try {
           const next = { ...cfg };
           if (has('sectionId')) {
-            const sections = (el('sectionId').value || '1').split(',')
+            const sections = (el('sectionId').value || '').split(',')
               .map(id => id.trim())
               .filter(id => id.length > 0);
             next.sectionId = sections;
@@ -217,7 +224,7 @@
         e.preventDefault();
         const next = { ...cfg };
         if (has('sectionId')) {
-          const sections = (el('sectionId').value || '1').split(',')
+          const sections = (el('sectionId').value || '').split(',')
             .map(id => id.trim())
             .filter(id => id.length > 0);
           next.sectionId = sections;
@@ -331,6 +338,230 @@
         window.open('index.html?preview=musicvideo', '_blank');
       });
     }
+  }
+
+  // ---------- Connect to Plex (first-run setup) ----------
+  // Sign in with Plex's device-link flow (a code entered at plex.tv/link), pick a server and what
+  // each library is for, and find the players to watch. It fills the fields below; Save Settings
+  // stores them, and an unconfigured wall then loads by itself (Dan, 2026-10-02).
+  const PIN_POLL_MS = 2000;
+  const PIN_GIVE_UP_MS = 15 * 60 * 1000;
+  const LIBRARY_ROLES = [['posters', 'Posters'], ['music', 'Music videos'], ['off', 'Not shown']];
+
+  function setupHeaders(extra) {
+    const headers = { ...(extra || {}) };
+    const key = has('adminKey') ? (el('adminKey').value || '').trim() : '';
+    if (key) headers['X-Admin-Key'] = key;
+    return headers;
+  }
+
+  function plexFieldHeaders() {
+    const headers = setupHeaders();
+    if (has('plexUrl') && el('plexUrl').value.trim()) headers['X-Plex-Url'] = el('plexUrl').value.trim();
+    if (has('plexToken') && el('plexToken').value.trim()) headers['X-Plex-Token'] = el('plexToken').value.trim();
+    if (has('plexInsecure') && el('plexInsecure').checked) headers['X-Allow-Insecure'] = '1';
+    return headers;
+  }
+
+  async function setupFetch(path, options) {
+    const r = await fetch(`${proxyBase()}${path}`, { cache: 'no-store', ...options });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `${path} ${r.status}`);
+    return body;
+  }
+
+  function showStep(id, on) { if (has(id)) el(id).hidden = !on; }
+  function say(id, text) { if (has(id)) el(id).textContent = text; }
+
+  function idList(id) {
+    return has(id) ? el(id).value.split(',').map(s => s.trim()).filter(Boolean) : [];
+  }
+
+  // Bumped by each sign-in and each server choice; an older one still awaiting a reply stops
+  // when it sees a newer number, so it can't overwrite what the user picked since (Astra pass 1)
+  let signInGen = 0;
+  let serverGen = 0;
+
+  async function signInWithPlex() {
+    const gen = ++signInGen;
+    serverGen++;
+    showStep('plexServers', false);
+    showStep('plexLibraries', false);
+    say('plexSignInStatus', 'Asking Plex for a code...');
+    showStep('plexSignIn', true);
+    let pin;
+    try {
+      pin = await setupFetch('/api/plex/pin', { method: 'POST', headers: setupHeaders() });
+    } catch (e) {
+      if (gen === signInGen) say('plexSignInStatus', `Couldn't start sign-in: ${e.message}`);
+      return;
+    }
+    if (gen !== signInGen) return;
+    say('plexPinCode', pin.code || '');
+    if (has('plexLinkUrl')) el('plexLinkUrl').href = pin.linkUrl || 'https://plex.tv/link';
+    say('plexSignInStatus', 'Waiting for you to enter the code...');
+    const started = Date.now();
+    while (Date.now() - started < PIN_GIVE_UP_MS) {
+      await new Promise(res => setTimeout(res, PIN_POLL_MS));
+      if (gen !== signInGen) return;
+      let check;
+      try {
+        check = await setupFetch(`/api/plex/pin/${encodeURIComponent(pin.id)}`, { headers: setupHeaders() });
+      } catch (e) {
+        say('plexSignInStatus', `Still waiting (${e.message})...`);
+        continue;
+      }
+      if (gen !== signInGen) return;
+      if (check.expired) break;
+      if (check.linked) {
+        say('plexSignInStatus', 'Signed in.');
+        showServers(check.servers || []);
+        return;
+      }
+    }
+    if (gen === signInGen) say('plexSignInStatus', 'The code expired. Press Sign in with Plex to get a new one.');
+  }
+
+  let plexServers = [];
+  function showServers(servers) {
+    plexServers = servers;
+    if (!servers.length) {
+      say('plexServerStatus', 'This Plex account has no servers.');
+      showStep('plexServers', true);
+      return;
+    }
+    const select = el('plexServer');
+    select.innerHTML = '';
+    servers.forEach((s, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = s.owned ? s.name : `${s.name} (shared with you)`;
+      select.appendChild(opt);
+    });
+    say('plexServerStatus', '');
+    showStep('plexServers', true);
+    if (servers.length === 1) useServer();
+  }
+
+  async function useServer() {
+    const server = plexServers[Number(el('plexServer').value) || 0];
+    if (!server) return;
+    const gen = ++serverGen;
+    say('plexServerStatus', `Finding ${server.name} on your network...`);
+    try {
+      const found = await setupFetch('/api/plex/connect', {
+        method: 'POST',
+        headers: setupHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ token: server.token, candidates: server.candidates, machineId: server.id })
+      });
+      if (gen !== serverGen) return;
+      el('plexUrl').value = found.plexUrl;
+      el('plexToken').value = server.token;
+      say('plexServerStatus', `Connected to ${server.name} at ${found.plexUrl}.`);
+      await loadLibraries(gen);
+    } catch (e) {
+      if (gen === serverGen) say('plexServerStatus', `Couldn't reach ${server.name} from the wall: ${e.message}`);
+    }
+  }
+
+  // A first setup's suggestion for a library. An "Other Videos" library (Plex's "none" agent)
+  // reports type movie too, so it isn't put in the poster rotation; one named for music videos
+  // is offered as the music library.
+  function freshLibraryRole(lib) {
+    const otherVideos = /\.none$/.test(lib.agent || '');
+    if (otherVideos) return /music/i.test(lib.title || '') ? 'music' : 'off';
+    return lib.type === 'movie' || lib.type === 'show' ? 'posters' : 'off';
+  }
+
+  async function loadLibraries(gen) {
+    const list = el('plexLibraryList');
+    list.textContent = 'Loading libraries...';
+    showStep('plexLibraries', true);
+    let libraries;
+    try {
+      libraries = (await setupFetch('/api/plex/libraries', { headers: plexFieldHeaders() })).libraries || [];
+    } catch (e) {
+      if (gen === serverGen) list.textContent = `Couldn't list the libraries: ${e.message}`;
+      return;
+    }
+    if (gen !== serverGen) return;
+    const posters = new Set(idList('sectionId'));
+    const music = new Set(idList('musicVideoSectionId'));
+    // A first setup (no libraries ever saved) gets a suggested role for each library
+    const fresh = !librariesChosen;
+    list.innerHTML = '';
+    for (const lib of libraries) {
+      const role = fresh ? freshLibraryRole(lib)
+        : music.has(lib.key) ? 'music' : posters.has(lib.key) ? 'posters' : 'off';
+      const row = document.createElement('label');
+      row.className = 'plex-library';
+      const name = document.createElement('span');
+      name.textContent = lib.title;
+      const select = document.createElement('select');
+      select.dataset.key = lib.key;
+      for (const [value, text] of LIBRARY_ROLES) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = text;
+        opt.selected = value === role;
+        select.appendChild(opt);
+      }
+      select.addEventListener('change', applyLibraryRoles);
+      row.append(name, select);
+      list.appendChild(row);
+    }
+    applyLibraryRoles();
+  }
+
+  // The library choices, written into the Section ID fields that Save Settings reads
+  function applyLibraryRoles() {
+    const picked = role => [...el('plexLibraryList').querySelectorAll('select')]
+      .filter(s => s.value === role).map(s => s.dataset.key);
+    if (has('sectionId')) el('sectionId').value = picked('posters').join(', ');
+    if (has('musicVideoSectionId')) el('musicVideoSectionId').value = picked('music').join(', ');
+    say('plexLibraryHint', 'Now press Save Settings at the bottom of the page.');
+  }
+
+  async function findPlayers() {
+    const out = el('playersList');
+    out.textContent = 'Looking for players...';
+    let players;
+    try {
+      players = (await setupFetch('/api/plex/players', { headers: plexFieldHeaders() })).players || [];
+    } catch (e) {
+      out.textContent = `Couldn't ask Plex: ${e.message}`;
+      return;
+    }
+    if (!players.length) {
+      out.textContent = 'Nothing is playing. Start something on the TV, then try again.';
+      return;
+    }
+    out.innerHTML = '';
+    for (const p of players) {
+      const row = document.createElement('div');
+      row.className = 'plex-player';
+      const text = document.createElement('span');
+      text.textContent = `${p.title || p.product} (${p.address}) playing ${p.playing}`;
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'btn';
+      add.textContent = 'Add';
+      add.addEventListener('click', () => {
+        const lines = el('plexDevices').value.split('\n').map(s => s.trim()).filter(Boolean);
+        if (!lines.includes(p.address)) lines.push(p.address);
+        el('plexDevices').value = lines.join('\n');
+        add.textContent = 'Added';
+        add.disabled = true;
+      });
+      row.append(text, add);
+      out.appendChild(row);
+    }
+  }
+
+  function bindPlexSetup() {
+    if (has('btnPlexSignIn')) el('btnPlexSignIn').addEventListener('click', signInWithPlex);
+    if (has('btnPlexUseServer')) el('btnPlexUseServer').addEventListener('click', useServer);
+    if (has('btnFindPlayers')) el('btnFindPlayers').addEventListener('click', findPlayers);
   }
 
   // Initialize enhanced color pickers with live hex updates
