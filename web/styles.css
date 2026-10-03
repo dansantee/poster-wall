@@ -931,6 +931,39 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Where the fun facts will pop up, YouTube-style (app.js renderFactMarks): a dot per bubble,
+   bright ahead of the playhead and faded once passed. Music only; the facts are music only. */
+.now-showing-marks {
+  display: none;
+}
+
+.now-showing.music .now-showing-progress {
+  position: relative;
+}
+
+.now-showing.music .now-showing-marks {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.now-showing-mark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0.6vh rgba(0, 0, 0, 0.5);
+}
+
+.now-showing-mark.passed {
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: none;
+}
+
 .now-showing.music .now-showing-progress-bar {
   border: none;
   border-radius: 999px;

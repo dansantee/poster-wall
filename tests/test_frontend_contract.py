@@ -537,6 +537,41 @@ def test_the_marquee_box_is_trimmed_to_its_capitals(source):
     assert 'id="nowShowingKerning" min="-0.5" max="1.0" step="0.005"' in settings
 
 
+@needs_node
+def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
+    """Dan, 2026-10-02: YouTube-style marks on the music bar for when the next fact comes. One
+    per slot updatePopup() would fill: from `first` every `every`, up to POPUP_REPEATS rounds of
+    the facts, while the bubble can finish before the song's quiet end."""
+    names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
+             "FACT_MARK_SLACK_MS", "factMarkTimes"]
+    t = "{first: 15000, every: 35000}"
+    twenty = "'" + "x" * 204 + "'"   # popupReadMs = 3 s + 204/12 s = 20 s
+    out = _run_js(source, names, [
+        f"factMarkTimes(240000, ['a', 'b', 'c'], {t})",          # 6 slots, all fit
+        f"factMarkTimes(240000, ['a', 'b', 'c', 'd'], {t})",     # the 7th (225 s) runs into the quiet end
+        f"factMarkTimes(60000, ['a', 'b'], {t})",                # a short song: only the first
+        f"factMarkTimes(240000, [], {t})",
+        f"factMarkTimes(0, ['a'], {t})",
+        f"factMarkTimes(25000, ['a'], {t})",                     # too short for even one
+        # Astra pass 1 #1: the 85 s slot ends exactly on the 105 s quiet end, so the bubble, judged
+        # on the tick after 85 s, never shows; it mustn't be marked
+        f"factMarkTimes(120000, [{twenty}, {twenty}], {t})",
+        f"popupReadMs({twenty})",
+    ])
+    assert out[7] == 20000
+    assert out[:7] == [[15000, 50000, 85000, 120000, 155000, 190000],
+                       [15000, 50000, 85000, 120000, 155000, 190000],
+                       [15000], [], [], [],
+                       [15000, 50000]]
+    app_js = source(APP_JS)
+    assert re.search(r"function renderProgress\(\) \{(?:(?!\n  \}\n).)*renderFactMarks\(\);", app_js, re.S)
+    css = source(STYLES_CSS)
+    assert re.search(r"(?m)^\.now-showing-marks \{\s*display: none;", css)
+    assert re.search(r"\.now-showing\.music \.now-showing-marks \{\s*display: block;", css)
+    assert ".now-showing-mark.passed {" in css
+    assert 'id="nowShowingMarks"' in source(INDEX_HTML)
+
+
 def test_the_details_line_is_movie_and_tv_only(source):
     css = source(STYLES_CSS)
     assert re.search(r"(?m)^\.now-showing-details \{\s*display: none;", css)

@@ -1159,6 +1159,7 @@
     const bar = document.getElementById('nowShowingProgressBar');
     if (bar && playback) bar.style.width = `${progressPercent()}%`;
     renderEndsAt();
+    renderFactMarks();
     updatePopup();
   }
 
@@ -1211,6 +1212,42 @@
     // ~12 characters a second, plus 3 s (Dan wanted a little more time than 15/s + 2 s),
     // capped so even a very long fact fits in its 35 s slot (Astra).
     return Math.min(POPUP_MAX_READ_MS, 3000 + String(text).length / 12 * 1000);
+  }
+
+  // YouTube-style marks on the music bar where the fun facts will pop up (Dan, 2026-10-02), from
+  // the schedule updatePopup() runs on: one per slot, while it can still finish before the
+  // song's quiet end. A mark sits where its slot opens; the bubble follows on the next tick.
+  // updatePopup() judges the quiet end from that later tick, so a slot that would end exactly
+  // on it is marked only with FACT_MARK_SLACK_MS to spare (Astra pass 1 #1: a mark whose bubble
+  // never came). A bubble inside that last second can still show unmarked; a mark never lies.
+  const FACT_MARK_SLACK_MS = 1000;
+  function factMarkTimes(duration, facts, timing) {
+    const times = [];
+    if (!(duration > 0) || !facts.length) return times;
+    for (let slot = 0; slot < facts.length * POPUP_REPEATS; slot++) {
+      const at = timing.first + slot * timing.every;
+      if (at + popupReadMs(facts[slot % facts.length]) + FACT_MARK_SLACK_MS > duration - POPUP_END_QUIET_MS) break;
+      times.push(at);
+    }
+    return times;
+  }
+
+  let factMarksFor = '';   // what the marks on screen were drawn for, to redraw only on change
+  function renderFactMarks() {
+    const el = document.getElementById('nowShowingMarks');
+    const nowShowing = document.getElementById('nowShowing');
+    if (!el || !nowShowing) return;
+    const music = nowShowing.classList.contains('music') && playback;
+    const times = music ? factMarkTimes(playback.duration, popupFacts, popupTiming) : [];
+    const key = music ? `${playback.key}|${playback.duration}|${times.join(',')}` : '';
+    if (key !== factMarksFor) {
+      factMarksFor = key;
+      el.innerHTML = times.map(at =>
+        `<span class="now-showing-mark" data-at="${at}" style="left: ${(at / playback.duration * 100).toFixed(3)}%"></span>`).join('');
+    }
+    if (!times.length) return;
+    const pos = positionMs();
+    for (const mark of el.children) mark.classList.toggle('passed', pos >= Number(mark.dataset.at));
   }
 
   function resetPopups(facts) {

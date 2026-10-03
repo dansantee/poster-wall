@@ -389,6 +389,18 @@ Two things about `nowplaying` mode are worth knowing:
       carries the facts. The kiosk adopts facts arriving on a later poll
       (`adoptLateFacts`) if the song has none yet.
     - `?preview=musicvideo&demo=popup` shows four hardcoded facts.
+    - **Marks on the bar** show where the facts will pop up, YouTube-style
+      (2026-10-02). `factMarkTimes()` walks the same slots as `updatePopup()`:
+      one per slot from 15 s every 35 s, up to two rounds of the facts, while a
+      bubble can still finish before the song's last 15 s with a second to spare.
+      (`updatePopup()` judges that from the tick after a slot opens, so a slot
+      ending exactly on the quiet end never shows; `FACT_MARK_SLACK_MS`.)
+      - `renderFactMarks()` runs on every progress tick. It redraws only when
+        the item, duration or schedule changes, and dims marks the playhead has
+        passed.
+      - A mark sits where its slot opens, and the bubble follows on the next
+        tick. A slot skipped live (joined too late, mid-song-change) still has
+        its mark.
   - The wall is **1080p portrait (1080×1920, scale 1.0) at 60 Hz** on a 4K TV,
     which upscales. At 4K the Pi 5 drew only 15-20 fps (see RASPBERRY-PI.md,
     `--mode`). Most font sizes are `clamp(min, Nvw, max)`, which hit their pixel

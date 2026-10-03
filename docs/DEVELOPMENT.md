@@ -78,7 +78,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-442 tests, a couple of seconds, no network and no Plex server. They never touch
+443 tests, a couple of seconds, no network and no Plex server. They never touch
 your real `proxy/config.json`. See [TESTING.md](TESTING.md) for what is covered
 and how to add to it.
 
