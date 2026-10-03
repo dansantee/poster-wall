@@ -931,7 +931,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Where the fun facts will pop up, YouTube-style (app.js renderFactMarks): a dot per bubble,
+/* Where the fun facts will pop up, YouTube-style (app.js renderFactMarks): a line per bubble,
    bright ahead of the playhead and faded once passed. Music only; the facts are music only. */
 .now-showing-marks {
   display: none;
@@ -948,20 +948,18 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   pointer-events: none;
 }
 
+/* A thin line across the bar (Dan, 2026-10-02: subtler than the first version's dots) */
 .now-showing-mark {
   position: absolute;
   top: 0;
   height: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
+  width: 0.28vw;
   transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0.6vh rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .now-showing-mark.passed {
-  background: rgba(0, 0, 0, 0.35);
-  box-shadow: none;
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .now-showing.music .now-showing-progress-bar {

@@ -569,6 +569,9 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     assert re.search(r"(?m)^\.now-showing-marks \{\s*display: none;", css)
     assert re.search(r"\.now-showing\.music \.now-showing-marks \{\s*display: block;", css)
     assert ".now-showing-mark.passed {" in css
+    # a thin line, not the first version's dot (Dan, 2026-10-02: "a little more subtle")
+    mark = re.search(r"(?m)^\.now-showing-mark \{([^}]*)\}", css).group(1)
+    assert "width: 0.28vw;" in mark and "height: 100%;" in mark and "border-radius" not in mark
     assert 'id="nowShowingMarks"' in source(INDEX_HTML)
 
 
