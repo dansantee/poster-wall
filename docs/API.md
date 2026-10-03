@@ -368,8 +368,10 @@ its addresses in the order to try from the wall: the LAN address over plain http
 
 ### `POST /api/plex/connect`
 
-Body `{"token": …, "candidates": [...], "machineId": …}` (up to 8 candidates). Calls
-`<candidate>/identity` on each, 3 s apiece, and returns the first where that server answers:
+Body `{"candidates": [...], "machineId": …}` (up to 8 candidates; a `token` is accepted but
+never sent). Calls `<candidate>/identity` on each, which needs no token, 3 s apiece, so no
+credential reaches an address before it's known to be the server. Returns the first where that
+server answers:
 `{"plexUrl": "http://192.168.1.3:32400"}`. With `machineId`, an address counts only if its
 `/identity` reports that `machineIdentifier`, because a shared server's private address can
 belong to something else on the wall's own network. If none does:

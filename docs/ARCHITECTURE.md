@@ -460,8 +460,11 @@ manages, which is what keeps unknown and legacy keys alive. See
 [CONFIGURATION.md](CONFIGURATION.md) for every key and its default.
 
 Nothing is stored in `localStorage`; a browser refresh always re-reads the
-server. Saving settings does **not** restart anything — the kiosk picks up new
-values on its next page load, which is what the "Restart Kiosk" button is for.
+server. Saving settings applies by itself: every 15 s (`CONFIG_WATCH_MS`) the kiosk
+compares the stored config, minus the keys the proxy computes, with what it loaded, and
+reloads when it changed. It only does that while the poster rotation is up, never in the
+middle of Now Playing. "Restart Kiosk" restarts Chromium itself, for anything a reload doesn't
+cover.
 
 ## Where things live
 

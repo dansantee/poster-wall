@@ -304,18 +304,19 @@ def plex_pin_check(pin_id):
 @app.route('/api/plex/connect', methods=['POST', 'OPTIONS'])
 def plex_connect():
     """The first of a server's addresses that answers from here as that server: body
-    {token, candidates, machineId}. With machineId (plex.tv's clientIdentifier for it), the
-    address only counts if /identity there reports the same machineIdentifier: a shared server's
-    private address can belong to something else on the wall's LAN (Astra pass 1)."""
+    {candidates, machineId} (a token is accepted but not sent). With machineId (plex.tv's
+    clientIdentifier for it), the address only counts if /identity there reports the same
+    machineIdentifier: a shared server's private address can belong to something else on the
+    wall's LAN (Astra pass 1). /identity needs no token, so none goes to an address before it
+    is known to be that server (Astra pass 3)."""
     if request.method == 'OPTIONS': return ('', 204)
     if admin_forbidden(): return jsonify({"error": "forbidden"}), 403
     body = request.get_json(silent=True) or {}
-    token = str(body.get('token') or '')
     machine_id = str(body.get('machineId') or '')
     tried = []
     for uri in [str(u) for u in (body.get('candidates') or [])][:8]:
         try:
-            r = requests.get(f"{uri.rstrip('/')}/identity", params={'X-Plex-Token': token},
+            r = requests.get(f"{uri.rstrip('/')}/identity",
                              headers=PLEX_HEADERS, timeout=CONNECT_TIMEOUT, verify=True)
             if not r.ok:
                 tried.append(f"{uri}: HTTP {r.status_code}")

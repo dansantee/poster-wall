@@ -133,6 +133,19 @@ def test_connect_only_takes_the_server_that_was_picked(client, plex):
     assert r.get_json() == {"plexUrl": "https://remote:14243"}
 
 
+def test_connect_never_sends_the_token_to_an_address_it_hasnt_verified(client, plex):
+    """Astra pass 3: the token went to every candidate before its identity was checked, so a
+    different machine at a shared server's private address received it. /identity needs none."""
+    plex.route("http://192.168.1.165:32400/identity",
+               FakeResponse({"MediaContainer": {"machineIdentifier": "someone-elses-plex"}}))
+    plex.route("https://remote:14243/identity", FakeResponse({"MediaContainer": {"machineIdentifier": "cliff-id"}}))
+    client.post("/api/plex/connect", json={"token": "secret-tok", "machineId": "cliff-id", "candidates": [
+        "http://192.168.1.165:32400", "https://remote:14243"]})
+    for call in plex.calls:
+        assert "secret-tok" not in repr(call.params) and "secret-tok" not in repr(call.headers), call.url
+        assert "secret-tok" not in call.url
+
+
 def test_connect_reports_a_different_server_or_none(client, plex):
     plex.route("http://a:32400/identity", FakeResponse({"MediaContainer": {"machineIdentifier": "other"}}))
     plex.route("http://b:32400/identity", FakeResponse(ValueError("not JSON")))

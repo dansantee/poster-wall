@@ -46,6 +46,45 @@
     }, SETUP_POLL_MS);
   }
 
+  // Saved settings apply by themselves: every CONFIG_WATCH_MS the kiosk compares the stored
+  // config with what it loaded and reloads when it changed, but only while the poster rotation
+  // is up, never in the middle of Now Playing. Without it, a TV added in the settings after the
+  // first Save (the README's order) was never watched (Astra pass 3).
+  const CONFIG_WATCH_MS = 15000;
+  const COMPUTED_CONFIG_KEYS = ['hostname', 'ip', 'configured'];
+
+  // A config as text, without the keys the proxy computes on every GET. loadCfg() takes the
+  // baseline from the very response the page runs on, so a save landing while the page starts
+  // up can't slip into the baseline unseen (Astra pass 4).
+  function configSignatureOf(j) {
+    const stored = { ...j };
+    for (const k of COMPUTED_CONFIG_KEYS) delete stored[k];
+    return JSON.stringify(Object.fromEntries(Object.keys(stored).sort().map(k => [k, stored[k]])));
+  }
+
+  async function configSignature() {
+    try {
+      const r = await fetch(`${proxyBase()}/api/config`, { cache: 'no-store' });
+      return r.ok ? configSignatureOf(await r.json()) : null;
+    } catch {
+      return null;   // the proxy restarting: no verdict this time; the next tick asks again
+    }
+  }
+
+  // Whether to reload now: the config changed, and the wall is showing posters. The mode is
+  // checked again after the fetch: playback may have started while it was out (Astra pass 4).
+  async function configChangedWhileIdle(loaded) {
+    if (currentMode !== 'rotation') return false;
+    const now = await configSignature();
+    return now !== null && now !== loaded && currentMode === 'rotation';
+  }
+
+  function watchConfig(loaded) {
+    setInterval(async () => {
+      if (await configChangedWhileIdle(loaded)) location.reload();
+    }, CONFIG_WATCH_MS);
+  }
+
   function showError(message, cfg) {
     const settingsUrl = settingsUrls(cfg).join(' or ');
     document.body.innerHTML = `
@@ -83,6 +122,7 @@
       plexInsecure:  !!j.plexInsecure,
       autoDim:       !!j.autoDim,
       hostname:      j.hostname      ?? '<hostname>',
+      signature:     configSignatureOf(j),   // for watchConfig: what this page was loaded with
       ip:            j.ip            ?? '',
       configured:    j.configured    !== false,   // false only when the proxy says Plex isn't set up
       nowShowingText:j.nowShowingText?? 'NOW SHOWING',
@@ -1556,6 +1596,7 @@
       if (previewMode !== 'rotation' && cfg.plexDevices && cfg.plexDevices.length > 0) {
         startNowPlayingMonitor(cfg);
       }
+      if (!previewMode) watchConfig(cfg.signature);
     }catch(e){
       console.error(e);
       // Try to get hostname and address from config if we managed to load it

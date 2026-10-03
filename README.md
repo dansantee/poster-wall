@@ -63,8 +63,9 @@ Full picture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
    library is for (posters, music videos, or not shown), and press **Save Settings**. The
    wall starts by itself.
 6. **Pick the TV to watch.** Start something playing on it, press **Find players** in the
-   settings, and **Add** it, then Save again. Playback on that TV switches the wall to
-   Now Showing.
+   settings, and **Add** it, then Save again. Within about 15 seconds the wall picks the
+   change up by itself (any saved setting does, while posters are showing), and playback on
+   that TV switches it to Now Showing.
 
 The installer is safe to re-run; it updates the code and re-applies the setup. See
 [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) for exactly what it changes and the options
@@ -165,7 +166,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-480 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
+482 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
 API's behaviour end to end, and — since the frontend has no build step or test
 runner — they also assert the string-level contracts that hold the project
 together: element ids matching the HTML, transition names matching the CSS,

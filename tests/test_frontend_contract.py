@@ -687,6 +687,54 @@ def test_the_settings_page_wires_up_plex_sign_in(source):
     assert "opt.textContent = s.owned ? s.name : `${s.name} (shared with you)`;" in settings_js
 
 
+@needs_node
+def test_saved_settings_reach_the_wall_without_a_restart(source):
+    """Astra pass 3: following the README (first Save, then Find players and Save again), the
+    second Save never reached the running kiosk, so the TV was never watched. The kiosk compares
+    the stored config every CONFIG_WATCH_MS and reloads on a change, only while posters show."""
+    prelude = """
+let stored = { rotateSec: 30, plexDevices: [], hostname: 'poster-wall', ip: '192.168.1.2', configured: true };
+let failNext = false;
+let onFetch = () => {};
+const proxyBase = () => '';
+const fetch = async () => {
+  onFetch();
+  if (failNext) { failNext = false; throw new Error('proxy restarting'); }
+  return { ok: true, json: async () => JSON.parse(JSON.stringify(stored)) };
+};
+let currentMode = 'rotation';
+"""
+    out = _run_js(source, ["COMPUTED_CONFIG_KEYS", "configSignatureOf", "configSignature", "configChangedWhileIdle"], [
+        """(async () => {
+          const loaded = configSignatureOf(stored);   // as loadCfg() takes it, from its own response
+          const results = [];
+          results.push(await configChangedWhileIdle(loaded));            // nothing changed
+          stored = { ...stored, ip: '192.168.1.3', hostname: 'other' };
+          results.push(await configChangedWhileIdle(loaded));            // only computed keys
+          stored = { configured: true, plexDevices: [], rotateSec: 30, ip: 'x', hostname: 'y' };
+          results.push(await configChangedWhileIdle(loaded));            // same config, keys reordered
+          stored = { ...stored, plexDevices: ['192.168.1.100'] };
+          currentMode = 'nowplaying';
+          results.push(await configChangedWhileIdle(loaded));            // changed, but mid-Now Playing
+          currentMode = 'rotation';
+          onFetch = () => { currentMode = 'nowplaying'; };               // playback starts mid-fetch
+          results.push(await configChangedWhileIdle(loaded));            // Astra pass 4: still no reload
+          onFetch = () => {};
+          currentMode = 'rotation';
+          failNext = true;
+          results.push(await configChangedWhileIdle(loaded));            // the proxy restarting: no verdict
+          results.push(await configChangedWhileIdle(loaded));            // ...and the next tick still sees it
+          return results;
+        })()""",
+    ], prelude=prelude)
+    assert out == [[False, False, False, False, False, False, True]]
+    app_js = source(APP_JS)
+    # Astra pass 4: the baseline is the response the page loaded with, never a later fetch
+    assert "signature:     configSignatureOf(j)," in app_js
+    assert "if (!previewMode) watchConfig(cfg.signature);" in app_js
+    assert "if (await configChangedWhileIdle(loaded)) location.reload();" in app_js
+
+
 def test_the_details_line_is_movie_and_tv_only(source):
     css = source(STYLES_CSS)
     assert re.search(r"(?m)^\.now-showing-details \{\s*display: none;", css)
