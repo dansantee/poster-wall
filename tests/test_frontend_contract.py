@@ -789,6 +789,9 @@ def test_the_details_line_is_movie_and_tv_only(source):
     assert re.search(r"\.now-showing:not\(\.music\) \.now-showing-details \{\s*display: flex;", css)
     index = source(INDEX_HTML)
     assert 'id="nowShowingWhat"' in index and 'id="nowShowingEnds"' in index
+    # Dan, 2026-10-04: half as far from the screen edges (was 1.5vw)
+    rule = re.search(r"\.now-showing:not\(\.music\) \.now-showing-details \{([^}]*)\}", css).group(1)
+    assert "padding: 0 0.75vw;" in rule
 
 
 # --------------------------------------------------------------------------

@@ -824,7 +824,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   display: flex;
   justify-content: space-between;
   gap: 3vw;
-  padding: 0 1.5vw;
+  padding: 0 0.75vw;   /* Dan, 2026-10-04: half as far from the edges as the first 1.5vw */
   /* Into the stack's gaps above and below, so the line costs the poster as little height as
      possible (each 1.5 px of height is 1 px of poster width) */
   margin: -0.9vw 0 -0.6vw;
