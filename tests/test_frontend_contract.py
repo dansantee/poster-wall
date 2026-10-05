@@ -492,6 +492,14 @@ def test_the_marquee_and_bar_take_the_posters_colour(source):
     assert "nowShowing.style.setProperty('--movie-accent', accent);" in app_js
     # back to the configured colours between items and on the way back to the rotation
     assert app_js.count("nowShowing.style.removeProperty('--movie-accent');") >= 3
+    # Dan, 2026-10-04: a mixed poster made the pick look random; standardize on the configured
+    # colour unless the posterColorMarquee setting is on (off by default). The else branch
+    # clears any accent; a changed setting reaches the kiosk when it reloads (the config watcher
+    # does that once posters are showing).
+    assert "posterColorMarquee:!!j.posterColorMarquee," in app_js
+    assert "if (!isMusicVideo && data.poster && cfg.posterColorMarquee) {" in app_js
+    assert 'id="posterColorMarquee"' in source(SETTINGS_HTML)
+    assert "el('posterColorMarquee').checked = !!cfg.posterColorMarquee;" in source(SETTINGS_JS)
 
 
 @needs_node

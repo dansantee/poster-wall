@@ -138,6 +138,7 @@
       progressBarHeight:j.progressBarHeight?? 2.5,
       autoDimStrength:Math.min(1, Math.max(0.2, Number(j.autoDimStrength) || 0.5)),
       posterTransitions:!!j.posterTransitions,
+      posterColorMarquee:!!j.posterColorMarquee,
       transitionTypes:(j.transitionTypes && Array.isArray(j.transitionTypes)) ? j.transitionTypes : ['crossfade'],
       musicVideoSectionId:Array.isArray(j.musicVideoSectionId) ? j.musicVideoSectionId : (j.musicVideoSectionId ? [String(j.musicVideoSectionId)] : []),
       plexDevices:   j.plexDevices   ?? []
@@ -827,10 +828,12 @@
     }
     setScrollingText(artistEl, isMusicVideo ? (data.artist || '') : '');
     setScrollingText(songEl, isMusicVideo ? (data.displayTitle || data.trackTitle || data.title || '') : '');
-    // Movies and TV: the marquee and the bar take the poster's vivid colour (Dan, 2026-09-30).
-    // The old colour stays until the new one is known; a poster with none (black and white,
-    // or one that fails to load) goes back to the configured colours.
-    if (!isMusicVideo && data.poster) {
+    // Movies and TV: with posterColorMarquee on, the marquee and the bar take the poster's
+    // colour (Dan, 2026-09-30). Off by default: a mixed poster made the pick look random, so
+    // Dan standardized on the configured colour (2026-10-04). The old colour stays until the
+    // new one is known; a poster with none (black and white, or one that fails to load) goes
+    // back to the configured colours.
+    if (!isMusicVideo && data.poster && cfg.posterColorMarquee) {
       const colorsFor = nowPlayingKey(data);
       computeArtColors(prox(data.poster), MOVIE_ACCENT_MIN_SCORE).then(colors => {
         if (currentItemKey !== colorsFor) return;

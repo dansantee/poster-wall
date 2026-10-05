@@ -211,7 +211,9 @@ Two things about `nowplaying` mode are worth knowing:
   alphabetic`, Chromium 133+; `line-height: 0.8` elsewhere). The font's room under the
   capitals used to leave a band between NOW SHOWING and the bar. Trimmed, the marquee
   grows (Bebas Neue 21) at the same height (2026-10-01).
-- **The marquee and bar take the poster's colour.** `computeArtColors()`, the music
+- **The marquee and bar can take the poster's colour**, with the `posterColorMarquee`
+  setting on (off by default since 2026-10-04: a mixed poster made the pick look random, so
+  the wall standardizes on the configured colour). `computeArtColors()`, the music
   screen's accent, picks the poster's vivid colour. That colour becomes `--movie-accent`
   on `#nowShowing`, and the title (with its glow), the bar and the end time use it.
   - An accent needs the poster's best pixels to be vivid enough (a score of saturation

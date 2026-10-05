@@ -93,6 +93,7 @@ Rec. 601 luma over a 32×32 sample is ≥ 200 of 255.
 | `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1, step 0.005. The title box is wider than the screen by that spacing (`--now-showing-kerning`), so every line stays centred on its visible letters despite the spacing after the last one, negative values included. |
 | `nowShowingFontWeight` | number | `700` | 300–900 in steps of 100. Only weights the loaded font actually ships will look different. |
 | `nowShowingColor` | string | `"#F4E88A"` | Marquee text colour, written to the `--now-showing-color` custom property. |
+| `posterColorMarquee` | boolean | `false` | Movies and TV: the marquee text, its glow, the progress bar and the end time take a colour from the poster (a muted poster gets a dusty version, a poster whose main colour matches `nowShowingColor` its second colour). Off, the default: they always use `nowShowingColor` / `progressBarColor`. Dan turned it off (2026-10-04) because a mixed poster made the pick look random. "Match the marquee to the poster's color" in the settings page. |
 
 Some fonts get extra treatment in `applyFontSettings()` — `text-transform:
 uppercase` for the display faces, plus `small-caps` for Playfair Display and

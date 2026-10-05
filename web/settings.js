@@ -97,6 +97,7 @@
       if (has('progressBarPadding')) el('progressBarPadding').value = cfg.progressBarPadding ?? 1.5;
       if (has('progressBarHeight')) el('progressBarHeight').value = cfg.progressBarHeight ?? 2.5;
       if (has('posterTransitions')) el('posterTransitions').checked = !!cfg.posterTransitions;
+      if (has('posterColorMarquee')) el('posterColorMarquee').checked = !!cfg.posterColorMarquee;
       
       // Handle transition types array (checkboxes)
       const transitionTypes = cfg.transitionTypes || ['crossfade'];
@@ -153,6 +154,7 @@
           if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
           if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
           if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
+          if (has('posterColorMarquee')) next.posterColorMarquee = !!el('posterColorMarquee').checked;
           
           // Collect selected transition types from checkboxes
           const selectedTransitions = [];
@@ -247,6 +249,7 @@
         if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
         if (has('progressBarHeight')) next.progressBarHeight = Number(el('progressBarHeight').value) || 2.5;
         if (has('posterTransitions')) next.posterTransitions = !!el('posterTransitions').checked;
+        if (has('posterColorMarquee')) next.posterColorMarquee = !!el('posterColorMarquee').checked;
         
         // Collect selected transition types from checkboxes
         const selectedTransitions = [];
