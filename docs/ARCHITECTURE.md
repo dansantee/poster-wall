@@ -214,6 +214,12 @@ Two things about `nowplaying` mode are worth knowing:
 - **The marquee and bar take the poster's colour.** `computeArtColors()`, the music
   screen's accent, picks the poster's vivid colour. That colour becomes `--movie-accent`
   on `#nowShowing`, and the title (with its glow), the bar and the end time use it.
+  - An accent needs the poster's best pixels to be vivid enough (a score of saturation
+    times distance from black and white). The music screen keeps 0.15
+    (`ACCENT_MIN_SCORE`), so a near-greyscale cover leaves its bar white. Movies and TV use
+    0.08 (`MOVIE_ACCENT_MIN_SCORE`), so a muted poster still colours the marquee: Lanterns'
+    olive green scored 0.149 and fell back to the default yellow (2026-10-04).
+    Black-and-white art scores well under either.
   - When the accent's hue is within 25° of the configured `nowShowingColor`, it would
     look like the default anyway. Then `movieAccent()` uses the poster's second colour,
     the most vivid hue at least 40° away (`artAccents()`), with a stronger saturation

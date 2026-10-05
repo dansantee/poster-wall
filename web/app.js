@@ -485,19 +485,25 @@
   // degrees of hue away (second, secondHue), for posters whose main colour is the marquee's own.
   const ACCENT_SECOND_GAP = 40;
   const ACCENT_SECOND_MIN_SCORE = 0.3;
+  // The vividness a poster's best pixels need for an accent: the music screen keeps white for
+  // near-greyscale art; movies and TV also colour a muted poster (Dan, 2026-10-04: Lanterns'
+  // olive-green poster scored 0.149 and kept the default yellow). Black-and-white art scores
+  // well under either.
+  const ACCENT_MIN_SCORE = 0.15;
+  const MOVIE_ACCENT_MIN_SCORE = 0.08;
   function hueGap(a, b) {
     const d = Math.abs(a - b) % 360;
     return Math.min(d, 360 - d);
   }
 
-  function artAccents(pixels) {
+  function artAccents(pixels, minScore = ACCENT_MIN_SCORE) {
     const lift = (rgbs, minS = 0.55, l = 66) => {
       const avg = [0, 1, 2].map(k => rgbs.reduce((sum, rgb) => sum + rgb[k], 0) / rgbs.length);
       const hsl = rgbToHsl(avg[0], avg[1], avg[2]);
       return { color: `hsl(${Math.round(hsl.h)}, ${Math.round(Math.max(hsl.s, minS) * 100)}%, ${l}%)`, hue: hsl.h };
     };
     const top = Math.max(...pixels.map(p => p.score));
-    if (!(top >= 0.15)) return { accent: null, accentHue: null, second: null, secondHue: null };
+    if (!(top >= minScore)) return { accent: null, accentHue: null, second: null, secondHue: null };
     const first = lift(pixels.filter(p => p.score >= top * 0.6).map(p => p.rgb));
     const others = pixels
       .map(p => ({ ...p, hue: rgbToHsl(...p.rgb).h }))
@@ -526,7 +532,7 @@
     return colors.accent;
   }
 
-  function computeArtColors(src) {
+  function computeArtColors(src, minScore = ACCENT_MIN_SCORE) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -543,7 +549,7 @@
           pixels.push({ rgb: [data[i], data[i+1], data[i+2]], score: hsl.s * (1 - Math.abs(hsl.l - 0.5) * 2) });
         }
         const backdrop = backdropColor(data);
-        resolve({ backdrop, ...artAccents(pixels) });
+        resolve({ backdrop, ...artAccents(pixels, minScore) });
       };
       img.onerror = () => resolve(null);
       img.src = src;
@@ -819,7 +825,7 @@
     // or one that fails to load) goes back to the configured colours.
     if (!isMusicVideo && data.poster) {
       const colorsFor = nowPlayingKey(data);
-      computeArtColors(prox(data.poster)).then(colors => {
+      computeArtColors(prox(data.poster), MOVIE_ACCENT_MIN_SCORE).then(colors => {
         if (currentItemKey !== colorsFor) return;
         const accent = movieAccent(colors, cfg.nowShowingColor);
         if (accent) nowShowing.style.setProperty('--movie-accent', accent);

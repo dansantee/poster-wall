@@ -495,13 +495,42 @@ def test_the_marquee_and_bar_take_the_posters_colour(source):
 
 
 @needs_node
+def test_a_muted_poster_still_colours_the_movie_marquee(source):
+    """Dan, 2026-10-04: Lanterns' muted olive-green poster scored 0.149, under the 0.15 cutoff,
+    and kept the default yellow. Movies and TV use a lower cutoff; the music screen keeps its
+    own (white for near-greyscale art), and black-and-white art gets no accent either way."""
+    names = ["rgbToHsl", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "ACCENT_MIN_SCORE",
+             "MOVIE_ACCENT_MIN_SCORE", "hueGap", "artAccents"]
+    setup = """
+const px = (rgb) => { const h = rgbToHsl(...rgb); return { rgb, score: h.s * (1 - Math.abs(h.l - 0.5) * 2) }; };
+const olive = Array(256).fill([85, 95, 60]).map(px);            // muted: scores about 0.14
+const blackAndWhite = Array(256).fill([120, 122, 118]).map(px);  // about 0.02
+"""
+    out = _run_js(source, names, [
+        "olive[0].score",
+        "artAccents(olive).accent",
+        "artAccents(olive, MOVIE_ACCENT_MIN_SCORE).accent",
+        "artAccents(blackAndWhite, MOVIE_ACCENT_MIN_SCORE).accent",
+    ], setup=setup)
+    assert 0.08 < out[0] < 0.15
+    assert out[1] is None                                   # the music screen's cutoff: no accent
+    assert re.fullmatch(r"hsl\((7\d|8\d), \d+%, 66%\)", out[2]), out[2]   # olive green, lifted
+    assert out[3] is None
+    app_js = source(APP_JS)
+    assert "computeArtColors(prox(data.poster), MOVIE_ACCENT_MIN_SCORE).then(colors => {" in app_js
+    # ...and computeArtColors hands it on (Astra P2: without this the test above still passed)
+    assert "function computeArtColors(src, minScore = ACCENT_MIN_SCORE) {" in app_js
+    assert "resolve({ backdrop, ...artAccents(pixels, minScore) });" in app_js
+
+
+@needs_node
 def test_a_poster_whose_colour_is_the_marquees_own_uses_its_second(source):
     """Dan, 2026-10-01: Doom Patrol's Season 3 poster is nearly all yellow, so its accent came out
     beside the default pale yellow; he expected the red that's also in it. When the accent's hue
     is within ACCENT_LIKE_CONFIGURED of the configured marquee colour, use the poster's second
     colour (at least ACCENT_SECOND_GAP away), if it has one."""
-    names = ["rgbToHsl", "hexToRgb", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "hueGap",
-             "artAccents", "ACCENT_LIKE_CONFIGURED", "movieAccent"]
+    names = ["rgbToHsl", "hexToRgb", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "ACCENT_MIN_SCORE",
+             "MOVIE_ACCENT_MIN_SCORE", "hueGap", "artAccents", "ACCENT_LIKE_CONFIGURED", "movieAccent"]
     # scored pixels as computeArtColors builds them
     setup = """
 const px = (rgb) => { const h = rgbToHsl(...rgb); return { rgb, score: h.s * (1 - Math.abs(h.l - 0.5) * 2) }; };
