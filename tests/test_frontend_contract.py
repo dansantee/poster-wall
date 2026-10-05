@@ -486,7 +486,7 @@ def test_the_marquee_and_bar_take_the_posters_colour(source):
     # `initial` in :root makes the var() fall back to the configured colours
     assert "--movie-accent: initial;" in css
     assert "color: var(--movie-accent, var(--now-showing-color));" in css
-    assert "background-color: var(--movie-accent, var(--progress-bar-color, #F4E88A));" in css
+    assert "background-color: var(--movie-accent, var(--progress-bar-color, #E0B44C));" in css
     app_js = source(APP_JS)
     assert "const accent = movieAccent(colors, cfg.nowShowingColor);" in app_js
     assert "nowShowing.style.setProperty('--movie-accent', accent);" in app_js
@@ -556,12 +556,12 @@ const grey = Array(256).fill([128, 128, 128]).map(px);
     out = _run_js(source, names, [
         "artAccents(yellowRed)",
         "artAccents(grey)",
-        "movieAccent(artAccents(yellowRed), '#F4E88A')",    # yellow like the default: the red
-        "movieAccent(artAccents(yellowOnly), '#F4E88A')",   # no second colour: keep the yellow
-        "movieAccent(artAccents(blueRed), '#F4E88A')",      # unlike the default: keep the blue
+        "movieAccent(artAccents(yellowRed), '#E0B44C')",    # yellow like the default: the red
+        "movieAccent(artAccents(yellowOnly), '#E0B44C')",   # no second colour: keep the yellow
+        "movieAccent(artAccents(blueRed), '#E0B44C')",      # unlike the default: keep the blue
         "movieAccent(artAccents(yellowRed), '#cccccc')",    # a grey marquee colour: no rule
-        "movieAccent(artAccents(grey), '#F4E88A')",
-        "movieAccent(null, '#F4E88A')",
+        "movieAccent(artAccents(grey), '#E0B44C')",
+        "movieAccent(null, '#E0B44C')",
     ], setup=setup)
     hue = lambda c: int(re.match(r"hsl\((\d+),", c).group(1))
     first, none = out[0], out[1]
@@ -904,8 +904,8 @@ DEFAULTS = [
     ("nowShowingFontSize", "9"),
     ("nowShowingKerning", "0.1"),
     ("nowShowingFontWeight", "700"),
-    ("nowShowingColor", "'#F4E88A'"),
-    ("progressBarColor", "'#F4E88A'"),
+    ("nowShowingColor", "'#E0B44C'"),
+    ("progressBarColor", "'#E0B44C'"),
     ("progressTrackColor", "'#788496'"),
     ("progressTrackOpacity", "0.92"),
     ("progressBarPadding", "1.5"),
@@ -930,8 +930,8 @@ def test_kiosk_and_settings_page_agree_on_defaults(source, key, literal):
 @pytest.mark.parametrize(
     "key,literal",
     [
-        ("nowShowingColor", "#F4E88A"),
-        ("progressBarColor", "#F4E88A"),
+        ("nowShowingColor", "#E0B44C"),
+        ("progressBarColor", "#E0B44C"),
         ("progressTrackColor", "#788496"),
         ("progressTrackOpacity", "0.92"),
         ("progressBarPadding", "1.5"),

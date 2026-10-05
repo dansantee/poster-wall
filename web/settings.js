@@ -86,8 +86,8 @@
       if (has('nowShowingFontSize')) el('nowShowingFontSize').value = cfg.nowShowingFontSize ?? 9;
       if (has('nowShowingKerning')) el('nowShowingKerning').value = cfg.nowShowingKerning ?? 0.1;
       if (has('nowShowingFontWeight')) el('nowShowingFontWeight').value = cfg.nowShowingFontWeight ?? 700;
-      if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#F4E88A';
-      if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#F4E88A';
+      if (has('nowShowingColor')) el('nowShowingColor').value = cfg.nowShowingColor ?? '#E0B44C';
+      if (has('progressBarColor')) el('progressBarColor').value = cfg.progressBarColor ?? '#E0B44C';
       if (has('progressTrackColor')) el('progressTrackColor').value = cfg.progressTrackColor ?? '#788496';
       if (has('progressTrackOpacity')) el('progressTrackOpacity').value = cfg.progressTrackOpacity ?? 0.92;
       
@@ -147,8 +147,8 @@
           if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
           if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
           if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
-          if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
-          if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+          if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#E0B44C';
+          if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#E0B44C';
           if (has('progressTrackColor')) next.progressTrackColor = el('progressTrackColor').value || '#788496';
           if (has('progressTrackOpacity')) next.progressTrackOpacity = Math.min(1, Math.max(0.1, Number(el('progressTrackOpacity').value) || 0.92));
           if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;
@@ -242,8 +242,8 @@
         if (has('nowShowingFontSize')) next.nowShowingFontSize = Number(el('nowShowingFontSize').value) || 9;
         if (has('nowShowingKerning')) next.nowShowingKerning = Number(el('nowShowingKerning').value) || 0.1;
         if (has('nowShowingFontWeight')) next.nowShowingFontWeight = Number(el('nowShowingFontWeight').value) || 700;
-        if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#F4E88A';
-        if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#F4E88A';
+        if (has('nowShowingColor')) next.nowShowingColor = el('nowShowingColor').value || '#E0B44C';
+        if (has('progressBarColor')) next.progressBarColor = el('progressBarColor').value || '#E0B44C';
         if (has('progressTrackColor')) next.progressTrackColor = el('progressTrackColor').value || '#788496';
         if (has('progressTrackOpacity')) next.progressTrackOpacity = Math.min(1, Math.max(0.1, Number(el('progressTrackOpacity').value) || 0.92));
         if (has('progressBarPadding')) next.progressBarPadding = Number(el('progressBarPadding').value) || 1.5;

@@ -32,8 +32,8 @@ that is what the **Restart Kiosk** button is for.
   "nowShowingFontSize": 21,
   "nowShowingFontWeight": 400,
   "nowShowingKerning": 0.035,
-  "nowShowingColor": "#f4e88a",
-  "progressBarColor": "#f4e88a",
+  "nowShowingColor": "#e0b44c",
+  "progressBarColor": "#e0b44c",
   "progressTrackColor": "#788496",
   "progressTrackOpacity": 0.92,
   "progressBarPadding": 0.3,
@@ -92,7 +92,7 @@ Rec. 601 luma over a 32×32 sample is ≥ 200 of 255.
 | `nowShowingFontSize` | number | `9` | Size in `vw`. Rendered as `clamp(size*5.33px, size vw, size*10.67px)` so it stays sane on odd resolutions. The pixel caps mean the same value looks twice as big at 1080p as at 4K (22 was right at 4K; the 1080p wall uses 11). At 1080×1920 the wall uses Bebas Neue at 21 with kerning 0.05 (weight 400): with the marquee box trimmed to its capitals and widened by the invisible spacing, that runs "NOW SHOWING" to within about 10 px of each edge. At 21, kerning 0.053 wraps it. UI range 5–24. Kerning 0.1 at 19, or 0.22 at 15, wraps it. With Cinzel, 11 just fits. |
 | `nowShowingKerning` | number | `0.1` | `letter-spacing` in `em`. UI range −0.5 to 1, step 0.005. The title box is wider than the screen by that spacing (`--now-showing-kerning`), so every line stays centred on its visible letters despite the spacing after the last one, negative values included. |
 | `nowShowingFontWeight` | number | `700` | 300–900 in steps of 100. Only weights the loaded font actually ships will look different. |
-| `nowShowingColor` | string | `"#F4E88A"` | Marquee text colour, written to the `--now-showing-color` custom property. |
+| `nowShowingColor` | string | `"#E0B44C"` (warm gold; the pale yellow `#F4E88A` before 2026-10-04) | Marquee text colour, written to the `--now-showing-color` custom property. |
 | `posterColorMarquee` | boolean | `false` | Movies and TV: the marquee text, its glow, the progress bar and the end time take a colour from the poster (a muted poster gets a dusty version, a poster whose main colour matches `nowShowingColor` its second colour). Off, the default: they always use `nowShowingColor` / `progressBarColor`. Dan turned it off (2026-10-04) because a mixed poster made the pick look random. "Match the marquee to the poster's color" in the settings page. |
 
 Some fonts get extra treatment in `applyFontSettings()` — `text-transform:
@@ -105,7 +105,7 @@ Shown only in "Now Showing" mode, reflecting `viewOffset / duration`.
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `progressBarColor` | string | `"#F4E88A"` | The filled portion (`--progress-bar-color`). |
+| `progressBarColor` | string | `"#E0B44C"` | The filled portion (`--progress-bar-color`). |
 | `progressTrackColor` | string | `"#788496"` | The unfilled track. Combined with the opacity below into an `rgba()` value for `--progress-track-color`. Must be a 6-digit hex; anything else is ignored and the CSS default stands. |
 | `progressTrackOpacity` | number | `0.92` | Track alpha, clamped to 0.1–1. |
 | `progressBarPadding` | number | `1.5` | Vertical space around the bar, in `vh`. |

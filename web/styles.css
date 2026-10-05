@@ -1,7 +1,7 @@
 :root{
   --bg:#000; --text:#e6e9ef; --muted:#97a1ad; --card:#0c0f14; --accent:#7aa2f7;
   --gap:12px; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.5);
-  --now-showing-color: #F4E88A; --progress-bar-color: #F4E88A;
+  --now-showing-color: #E0B44C; --progress-bar-color: #E0B44C;
   --progress-track-color: rgba(120, 132, 150, 0.92);
   --progress-bar-padding: 1.5vh; /* Default padding value */
   --progress-bar-height: 2.5vh; /* Default height value */
@@ -500,7 +500,7 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
   padding: 0; /* Remove any default padding */
   line-height: 0.9; /* Tighter line height to reduce font spacing */
   color: var(--now-showing-color);
-  text-shadow: 0 4px 20px rgba(244, 232, 138, 0.3);
+  text-shadow: 0 4px 20px rgba(224, 180, 76, 0.3);
   text-transform: uppercase; /* Ensure it's always uppercase */
   flex-shrink: 0;
   /* Optimize font rendering for Google Fonts */
@@ -526,11 +526,11 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 
 .now-showing-progress-bar {
   height: 100%;
-  background-color: var(--progress-bar-color, #F4E88A); /* Fallback color */
+  background-color: var(--progress-bar-color, #E0B44C); /* Fallback color */
   border-radius: 0; /* Remove border radius to match full-width container */
   /* app.js redraws the bar every 250 ms from the local playback clock */
   transition: width 0.25s linear;
-  box-shadow: 0 0 15px rgba(244, 232, 138, 0.5);
+  box-shadow: 0 0 15px rgba(224, 180, 76, 0.5);
   width: 0%; /* Start at 0%, JavaScript will set the actual width */
   display: block;
   /* Add a visible border for debugging */
@@ -811,8 +811,8 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
 }
 
 .now-showing:not(.music) .now-showing-progress-bar {
-  background-color: var(--movie-accent, var(--progress-bar-color, #F4E88A));
-  box-shadow: 0 0 15px color-mix(in srgb, var(--movie-accent, var(--progress-bar-color, #F4E88A)) 50%, transparent);
+  background-color: var(--movie-accent, var(--progress-bar-color, #E0B44C));
+  box-shadow: 0 0 15px color-mix(in srgb, var(--movie-accent, var(--progress-bar-color, #E0B44C)) 50%, transparent);
 }
 
 /* What's on and when it ends, one line between the bar and the poster */
