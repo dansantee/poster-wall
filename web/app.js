@@ -491,20 +491,27 @@
   // well under either.
   const ACCENT_MIN_SCORE = 0.15;
   const MOVIE_ACCENT_MIN_SCORE = 0.08;
+  // A muted poster (admitted only by the movie cutoff) keeps a dusty version of its colour: its
+  // saturation held between these, instead of lifted to 55% (Dan, 2026-10-04: Lanterns' olive
+  // came out pea green at 55%; he picked sage, hsl(78, 28%, 66%), from renders)
+  const MUTED_ACCENT_SAT = [0.28, 0.35];
   function hueGap(a, b) {
     const d = Math.abs(a - b) % 360;
     return Math.min(d, 360 - d);
   }
 
   function artAccents(pixels, minScore = ACCENT_MIN_SCORE) {
-    const lift = (rgbs, minS = 0.55, l = 66) => {
+    const lift = (rgbs, minS = 0.55, l = 66, maxS = 1) => {
       const avg = [0, 1, 2].map(k => rgbs.reduce((sum, rgb) => sum + rgb[k], 0) / rgbs.length);
       const hsl = rgbToHsl(avg[0], avg[1], avg[2]);
-      return { color: `hsl(${Math.round(hsl.h)}, ${Math.round(Math.max(hsl.s, minS) * 100)}%, ${l}%)`, hue: hsl.h };
+      const s = Math.min(maxS, Math.max(hsl.s, minS));
+      return { color: `hsl(${Math.round(hsl.h)}, ${Math.round(s * 100)}%, ${l}%)`, hue: hsl.h };
     };
     const top = Math.max(...pixels.map(p => p.score));
     if (!(top >= minScore)) return { accent: null, accentHue: null, second: null, secondHue: null };
-    const first = lift(pixels.filter(p => p.score >= top * 0.6).map(p => p.rgb));
+    const muted = top < ACCENT_MIN_SCORE;
+    const vivid = pixels.filter(p => p.score >= top * 0.6).map(p => p.rgb);
+    const first = muted ? lift(vivid, MUTED_ACCENT_SAT[0], 66, MUTED_ACCENT_SAT[1]) : lift(vivid);
     const others = pixels
       .map(p => ({ ...p, hue: rgbToHsl(...p.rgb).h }))
       .filter(p => p.score >= ACCENT_SECOND_MIN_SCORE && hueGap(p.hue, first.hue) >= ACCENT_SECOND_GAP);

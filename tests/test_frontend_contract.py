@@ -500,22 +500,28 @@ def test_a_muted_poster_still_colours_the_movie_marquee(source):
     and kept the default yellow. Movies and TV use a lower cutoff; the music screen keeps its
     own (white for near-greyscale art), and black-and-white art gets no accent either way."""
     names = ["rgbToHsl", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "ACCENT_MIN_SCORE",
-             "MOVIE_ACCENT_MIN_SCORE", "hueGap", "artAccents"]
+             "MOVIE_ACCENT_MIN_SCORE", "MUTED_ACCENT_SAT", "hueGap", "artAccents"]
     setup = """
 const px = (rgb) => { const h = rgbToHsl(...rgb); return { rgb, score: h.s * (1 - Math.abs(h.l - 0.5) * 2) }; };
 const olive = Array(256).fill([85, 95, 60]).map(px);            // muted: scores about 0.14
 const blackAndWhite = Array(256).fill([120, 122, 118]).map(px);  // about 0.02
+const vividGreen = Array(256).fill([40, 170, 60]).map(px);      // well over 0.15
 """
     out = _run_js(source, names, [
         "olive[0].score",
         "artAccents(olive).accent",
         "artAccents(olive, MOVIE_ACCENT_MIN_SCORE).accent",
         "artAccents(blackAndWhite, MOVIE_ACCENT_MIN_SCORE).accent",
+        "artAccents(vividGreen, MOVIE_ACCENT_MIN_SCORE).accent",
     ], setup=setup)
     assert 0.08 < out[0] < 0.15
     assert out[1] is None                                   # the music screen's cutoff: no accent
-    assert re.fullmatch(r"hsl\((7\d|8\d), \d+%, 66%\)", out[2]), out[2]   # olive green, lifted
+    # Dan, 2026-10-04: a muted poster gets a dusty version of its colour (sage for Lanterns'
+    # olive), its saturation held at 28-35%, not lifted to 55% ("pea green")
+    sage = re.fullmatch(r"hsl\((7\d|8\d), (\d+)%, 66%\)", out[2])
+    assert sage and 28 <= int(sage.group(2)) <= 35, out[2]
     assert out[3] is None
+    assert re.fullmatch(r"hsl\(1[23]\d, (5[5-9]|[6-9]\d)%, 66%\)", out[4]), out[4]   # vivid: unchanged rule
     app_js = source(APP_JS)
     assert "computeArtColors(prox(data.poster), MOVIE_ACCENT_MIN_SCORE).then(colors => {" in app_js
     # ...and computeArtColors hands it on (Astra P2: without this the test above still passed)
@@ -530,7 +536,7 @@ def test_a_poster_whose_colour_is_the_marquees_own_uses_its_second(source):
     is within ACCENT_LIKE_CONFIGURED of the configured marquee colour, use the poster's second
     colour (at least ACCENT_SECOND_GAP away), if it has one."""
     names = ["rgbToHsl", "hexToRgb", "ACCENT_SECOND_GAP", "ACCENT_SECOND_MIN_SCORE", "ACCENT_MIN_SCORE",
-             "MOVIE_ACCENT_MIN_SCORE", "hueGap", "artAccents", "ACCENT_LIKE_CONFIGURED", "movieAccent"]
+             "MOVIE_ACCENT_MIN_SCORE", "MUTED_ACCENT_SAT", "hueGap", "artAccents", "ACCENT_LIKE_CONFIGURED", "movieAccent"]
     # scored pixels as computeArtColors builds them
     setup = """
 const px = (rgb) => { const h = rgbToHsl(...rgb); return { rgb, score: h.s * (1 - Math.abs(h.l - 0.5) * 2) }; };
@@ -1242,10 +1248,16 @@ def test_the_movie_stack_has_even_gaps_and_runs_edge_to_edge(source):
     title = rule(".now-showing:not(.music) .now-showing-title")
     # Dan, 2026-09-30: a line box of 1 left a black band above and below the capitals
     assert "margin: 0;" in title and "line-height: 0.8;" in title
-    # The trailing letter-spacing is matched by an indent of the same width, so the word stays
-    # centred at any kerning, negative included (padding can't go negative: Astra pass 1 #1).
-    assert "text-indent: var(--now-showing-kerning, 0.1em);" in title
-    assert "padding-left" not in title
+    # Dan, 2026-10-04: the spacing after each line's last letter is invisible but counted, so
+    # the title wrapped ~20 px short of the edges. The box is wider than the screen by that
+    # spacing, to the right: every centred line, wrapped ones included, sits on the screen's
+    # centre and only its visible letters count. (An indent only re-centred the first line,
+    # and with a negative margin clipped a wrapped second line: Astra.)
+    assert "width: calc(100vw + var(--now-showing-kerning, 0.1em));" in title
+    assert "max-width: none;" in title
+    assert "text-indent" not in title and "padding-left" not in title and "margin-left" not in title
+    assert "nowrap" not in title
+    assert re.search(r"(?m)^\.now-showing \{\s*overflow: hidden;", css)   # the extra box is clipped
     assert "titleEl.style.setProperty('--now-showing-kerning', `${kerning}em`)" in source(APP_JS)
     # A big nowShowingFontSize (UI max 20) must wrap, not run off the edges (Astra pass 1 #1).
     assert "nowrap" not in title

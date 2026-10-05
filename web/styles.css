@@ -780,10 +780,16 @@ input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #293
      text-box is supported (Chromium 133+; the Pi has 139) the box is trimmed to the capitals
      exactly, below, so a bigger marquee costs no extra height. */
   line-height: 0.8;
-  /* The letter-spacing trails the last letter; an indent of the same width re-centres the word.
-     text-indent, unlike padding, also takes a negative kerning (Astra pass 1 #1). app.js sets
-     --now-showing-kerning from the nowShowingKerning setting. */
-  text-indent: var(--now-showing-kerning, 0.1em);
+  /* The letter-spacing trails each line's last letter. The box is wider than the screen by
+     that spacing, to the right (.now-showing clips it): each centred line then has its
+     visible letters on the screen's centre, and only they count toward wrapping, so the title
+     can run nearly to the edges (Dan, 2026-10-04: "can't we get a little closer to the
+     edge?"). It replaced an indent, which only re-centred the first line, wasted ~20 px
+     of width, and with a negative margin clipped a wrapped second line (Astra). Negative
+     kerning narrows the box the same way. app.js sets --now-showing-kerning from the
+     nowShowingKerning setting. */
+  width: calc(100vw + var(--now-showing-kerning, 0.1em));
+  max-width: none;
 }
 
 @supports (text-box: trim-both cap alphabetic) {

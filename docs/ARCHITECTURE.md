@@ -220,6 +220,10 @@ Two things about `nowplaying` mode are worth knowing:
     0.08 (`MOVIE_ACCENT_MIN_SCORE`), so a muted poster still colours the marquee: Lanterns'
     olive green scored 0.149 and fell back to the default yellow (2026-10-04).
     Black-and-white art scores well under either.
+  - A muted poster (one only the movie cutoff admits) keeps a dusty version of its
+    colour: saturation held at 28-35% (`MUTED_ACCENT_SAT`) instead of lifted to 55%.
+    Lanterns' olive came out pea green at 55%; it's now sage, `hsl(78, 28%, 66%)`, the
+    shade Dan picked from renders.
   - When the accent's hue is within 25° of the configured `nowShowingColor`, it would
     look like the default anyway. Then `movieAccent()` uses the poster's second colour,
     the most vivid hue at least 40° away (`artAccents()`), with a stronger saturation
@@ -506,6 +510,10 @@ tests so a future change is deliberate.
 - **The marquee never shows the title.** Only the configured `nowShowingText` is
   displayed there. The title goes in the details line under the bar
   (`detailsText()`), and the old `.now-showing-movie-title` rule is unused.
+- **The marquee's box is wider than the screen** by twice the letter-spacing, centred. The
+  indent that re-centres the word and the spacing after its last letter are invisible but
+  count toward the line, so the title used to wrap while its letters were still ~20 px from
+  the edges. Now only the visible letters count; `.now-showing` clips the extra box.
 - **No retry on boot.** If the proxy is not answering when Chromium loads the
   page, the kiosk shows the error screen until it is reloaded. (An unconfigured
   wall is different: its setup screen polls `/api/config` every 5 s and reloads
