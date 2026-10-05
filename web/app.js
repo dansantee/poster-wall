@@ -1246,10 +1246,12 @@
     return [data.title, data.year].filter(Boolean).join(' · ');
   }
 
+  // A 12-hour clock without AM/PM ("Ends 11:47"), whatever the browser's locale: the Pi's
+  // defaults to 24-hour (Dan, 2026-10-04)
   function endsAtText(now, remainingMs) {
     if (!(remainingMs > 0)) return '';
     const end = new Date(now + remainingMs);
-    return 'Ends ' + end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `Ends ${end.getHours() % 12 || 12}:${String(end.getMinutes()).padStart(2, '0')}`;
   }
 
   function renderEndsAt() {

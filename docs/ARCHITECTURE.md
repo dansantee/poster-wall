@@ -225,7 +225,7 @@ Two things about `nowplaying` mode are worth knowing:
     then: `:root` holds `--movie-accent: initial`, so the `var()` fallbacks win.
 - **The details line** sits between the bar and the poster. It shows what's on
   (`S2 · E9 · Wax Patrol` from the episode title, or `Ghosted · 2023`) and, at the
-  right, `Ends 11:47 PM`.
+  right, `Ends 11:47` (a 12-hour clock without AM/PM, formatted by hand: the Pi's locale gave 24-hour).
   - The end time is recomputed on every progress tick from the local playback clock,
     so a pause pushes it out.
   - Negative margins tuck the line into the stack's gaps, so it costs the poster as

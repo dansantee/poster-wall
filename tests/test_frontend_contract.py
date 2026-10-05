@@ -417,14 +417,19 @@ def test_the_details_line_names_the_episode_or_the_movie(source):
 
 @needs_node
 def test_the_end_time_counts_the_time_left(source):
+    """Dan, 2026-10-04: a 12-hour clock with no AM/PM. The Pi's locale gave 24-hour, so the
+    time is formatted by hand, not by toLocaleTimeString."""
     out = _run_js(source, ["endsAtText"], [
         "endsAtText(new Date(2026, 8, 30, 23, 0).getTime(), 47 * 60000)",
+        "endsAtText(new Date(2026, 8, 30, 23, 30).getTime(), 35 * 60000)",   # past midnight
+        "endsAtText(new Date(2026, 8, 30, 11, 50).getTime(), 15 * 60000)",   # noon hour
+        "endsAtText(new Date(2026, 8, 30, 9, 0).getTime(), 3 * 60000)",
         "endsAtText(Date.now(), 0)",
         "endsAtText(Date.now(), -5)",
         "endsAtText(Date.now(), NaN)",
     ])
-    assert re.fullmatch(r"Ends 11:47\s?PM", out[0]), out[0]
-    assert out[1:] == ["", "", ""]
+    assert out == ["Ends 11:47", "Ends 12:05", "Ends 12:05", "Ends 9:03", "", "", ""]
+    assert "toLocaleTimeString" not in source(APP_JS)
     app_js = source(APP_JS)
     # recomputed on every progress tick, so a pause pushes the end time out
     assert re.search(r"function renderProgress\(\) \{(?:(?!\n  \}\n).)*renderEndsAt\(\);", app_js, re.S)
