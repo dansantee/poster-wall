@@ -34,6 +34,7 @@ Full picture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | [RASPBERRY-PI.md](docs/RASPBERRY-PI.md) | What `setup.sh` does, the services, deploy workflows, troubleshooting |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local dev on Windows, preview modes, what to keep in sync |
 | [TESTING.md](docs/TESTING.md) | Running and extending the test suite |
+| [FUN-FACTS.md](docs/FUN-FACTS.md) | Pop-Up Video style facts for music videos: finding them and putting them in Plex |
 
 ## What you need
 
