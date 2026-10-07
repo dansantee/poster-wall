@@ -166,7 +166,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-484 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
+485 tests, a couple of seconds, no Plex server or network needed. They cover the proxy
 API's behaviour end to end, and — since the frontend has no build step or test
 runner — they also assert the string-level contracts that hold the project
 together: element ids matching the HTML, transition names matching the CSS,

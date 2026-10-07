@@ -593,7 +593,7 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     per slot updatePopup() would fill: from `first` every `every`, up to POPUP_REPEATS rounds of
     the facts, while the bubble can finish before the song's quiet end."""
     names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
-             "FACT_MARK_SLACK_MS", "factMarkTimes"]
+             "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes"]
     t = "{first: 15000, every: 35000}"
     twenty = "'" + "x" * 204 + "'"   # popupReadMs = 3 s + 204/12 s = 20 s
     out = _run_js(source, names, [
@@ -623,6 +623,44 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     mark = re.search(r"(?m)^\.now-showing-mark \{([^}]*)\}", css).group(1)
     assert "width: 0.28vw;" in mark and "height: 100%;" in mark and "border-radius" not in mark
     assert 'id="nowShowingMarks"' in source(INDEX_HTML)
+
+
+@needs_node
+def test_a_long_song_spreads_its_fact_bubbles_to_the_end(source):
+    """Dan, 2026-10-07: on Father Figure and Thriller the facts crammed in at the front and the
+    end had nothing. Slots stay at least `every` apart but stretch to fill a long song up to its
+    quiet end; the marks and updatePopup() use the same slots."""
+    names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
+             "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes", "updatePopup"]
+    prelude = """
+let playback, popupFacts, popupTiming, popupSlot, popupShown, popupShownAt, popupHideAt, posNow;
+let popupNotBefore = 0, trackAnimating = false;
+function positionMs() { return posNow; }
+function popInPopup(slot) { popupSlot = slot; popupShown.add(slot); }
+function popOutPopup() { popupSlot = -1; }
+"""
+    setup = """
+const t = {first: 15000, every: 35000};
+const four = ['a', 'b', 'c', 'd'];
+function slotAt(duration, pos) {
+  playback = {duration}; popupFacts = four; popupTiming = t;
+  popupSlot = -1; popupShown = new Set(); posNow = pos;
+  updatePopup();
+  return popupSlot;
+}
+"""
+    out = _run_js(source, names, [
+        "factMarkTimes(400000, four, t)",   # 6:40: (400 - 15 - 15) s / 8 slots = 46.25 s apart
+        "factMarkTimes(820000, four, t)",   # Thriller's 13:40: 98.75 s apart
+        "factMarkTimes(240000, four, t)",   # a short song keeps the 35 s minimum
+        "slotAt(400000, 300000)",           # was past the last 35 s slot: now slot 6
+        "slotAt(400000, 339000)",           # the last slot, near the end
+        "slotAt(240000, 50000)",            # unchanged on a short song
+    ], prelude=prelude, setup=setup)
+    assert out[0] == [15000, 61250, 107500, 153750, 200000, 246250, 292500, 338750]
+    assert out[1] == [15000, 113750, 212500, 311250, 410000, 508750, 607500, 706250]
+    assert out[2] == [15000, 50000, 85000, 120000, 155000, 190000]
+    assert out[3:] == [6, 7, 1]
 
 
 @needs_node
@@ -1156,7 +1194,7 @@ def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
     assert "const POPUP_MAX_READ_MS = 20000;" in popup
     # Driven by the playback position (a pause holds the bubble; a seek picks the slot).
     assert "const pos = positionMs();" in popup
-    assert "const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);" in popup
+    assert "const slot = Math.floor((pos - popupTiming.first) / every);" in popup
     assert "playback.duration - POPUP_END_QUIET_MS" in popup
     # Astra pass 1: every shown slot is remembered (a seek back doesn't repeat a fact); the
     # start position is stored, not recomputed (a paused bubble must stay); and new bubbles

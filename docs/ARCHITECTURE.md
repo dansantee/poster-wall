@@ -371,10 +371,14 @@ Two things about `nowplaying` mode are worth knowing:
     points into the art and a "bloop" scale pop in and out. A thin dark outline
     (a `drop-shadow` filter, so the tail has it too) keeps the balloon visible on
     white album art (2026-10-03). The first comes at
-    15 s, then one per 35 s slot, each held for its reading time (3 s plus 12
+    15 s, then one per slot, each held for its reading time (3 s plus 12
     characters a second).
     - The slots cycle through the facts, and each fact shows up to twice
       (`POPUP_REPEATS`), a slow stream for anyone who missed one.
+    - A slot is 35 s at least. On a long song `popupEvery()` stretches the
+      slots so they fill the song up to its quiet end instead of bunching at
+      the front (2026-10-07: Father Figure and Thriller had nothing in their
+      last minutes). A 6:40 song with four facts gets one about every 46 s.
     - `updatePopup()` runs on the progress tick from the playback position, so
       a pause holds a bubble and a seek picks that slot's fact. Only a jump
       back of more than 3 s counts as a seek, since each Plex report
@@ -407,7 +411,7 @@ Two things about `nowplaying` mode are worth knowing:
     - `?preview=musicvideo&demo=popup` shows four hardcoded facts.
     - **Marks on the bar** show where the facts will pop up, YouTube-style
       (2026-10-02). `factMarkTimes()` walks the same slots as `updatePopup()`:
-      one per slot from 15 s every 35 s, up to two rounds of the facts, while a
+      one per slot from 15 s, up to two rounds of the facts, while a
       bubble can still finish before the song's last 15 s with a second to spare.
       (`updatePopup()` judges that from the tick after a slot opens, so a slot
       ending exactly on the quiet end never shows; `FACT_MARK_SLACK_MS`.)

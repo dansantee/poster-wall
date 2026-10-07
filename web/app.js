@@ -1279,9 +1279,9 @@
 
   // ---- fun-fact bubbles (music layout, Pop-Up Video style) ----
   // data.facts (short strings; none means no bubbles) pop up over a corner of the art: the
-  // first 15 s in, then one per 35 s slot, each held for its reading time. It runs off the
-  // playback position, so a pause holds the bubble and a seek picks the matching slot; nothing
-  // starts in a song's last 15 s or during a song change.
+  // first 15 s in, then one per slot (35 s, longer on a long song), each held for its reading
+  // time. It runs off the playback position, so a pause holds the bubble and a seek picks the
+  // matching slot; nothing starts in a song's last 15 s or during a song change.
   const POPUP_END_QUIET_MS = 15000;
   const POPUP_SETTLE_MS = 1500;  // after a new item: lets a change's last flourishes finish
   // Only a jump back further than this counts as a seek. Each ~10 s Plex report re-anchors the
@@ -1306,6 +1306,15 @@
     return Math.min(POPUP_MAX_READ_MS, 3000 + String(text).length / 12 * 1000);
   }
 
+  // The slot length: never under timing.every, and stretched on a long song so the slots fill it
+  // up to the quiet end instead of all bunching at the front (Dan, 2026-10-07: Father Figure and
+  // Thriller went quiet for their last minutes).
+  function popupEvery(duration, count, timing) {
+    const slots = count * POPUP_REPEATS;
+    if (!(duration > 0) || !slots) return timing.every;
+    return Math.max(timing.every, Math.floor((duration - POPUP_END_QUIET_MS - timing.first) / slots));
+  }
+
   // YouTube-style marks on the music bar where the fun facts will pop up (Dan, 2026-10-02), from
   // the schedule updatePopup() runs on: one per slot, while it can still finish before the
   // song's quiet end. A mark sits where its slot opens; the bubble follows on the next tick.
@@ -1316,8 +1325,9 @@
   function factMarkTimes(duration, facts, timing) {
     const times = [];
     if (!(duration > 0) || !facts.length) return times;
+    const every = popupEvery(duration, facts.length, timing);
     for (let slot = 0; slot < facts.length * POPUP_REPEATS; slot++) {
-      const at = timing.first + slot * timing.every;
+      const at = timing.first + slot * every;
       if (at + popupReadMs(facts[slot % facts.length]) + FACT_MARK_SLACK_MS > duration - POPUP_END_QUIET_MS) break;
       times.push(at);
     }
@@ -1412,10 +1422,11 @@
       return;
     }
     if (trackAnimating || Date.now() < popupNotBefore) return;
-    const slot = Math.floor((pos - popupTiming.first) / popupTiming.every);
+    const every = popupEvery(playback.duration, popupFacts.length, popupTiming);
+    const slot = Math.floor((pos - popupTiming.first) / every);
     if (slot < 0 || slot >= popupFacts.length * POPUP_REPEATS || popupShown.has(slot)) return;
     const read = popupReadMs(popupFacts[slot % popupFacts.length]);
-    if (pos + read > popupTiming.first + (slot + 1) * popupTiming.every) return;   // joined too late
+    if (pos + read > popupTiming.first + (slot + 1) * every) return;   // joined too late
     if (playback.duration && pos + read > playback.duration - POPUP_END_QUIET_MS) return;
     popupShownAt = pos;
     popupHideAt = pos + read;

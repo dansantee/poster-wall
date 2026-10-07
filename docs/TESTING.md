@@ -6,7 +6,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-484 tests, a couple of seconds, no network, no Plex server, no browser.
+485 tests, a couple of seconds, no network, no Plex server, no browser.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_now_playing_api.py -v   # one file

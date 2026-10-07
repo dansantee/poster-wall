@@ -61,7 +61,8 @@ parameter:
 Either now-playing preview also takes `&state=paused` (the pause dim and badge)
 or `&state=loading` (the spinner shown while waiting for a queue's next item).
 `?preview=musicvideo&demo=popup` shows the fun-fact bubbles with four hardcoded
-facts on a shortened clock (the first at 3 s, then every 12 s).
+facts on a shortened clock (the first at 3 s, then at least 12 s apart; spread
+over its 3-minute song, about every 20 s).
 `?preview=musicvideo&demo=advance` plays the song-change transition every 5 s,
 rotating through the preview's items. A screenshot can't show motion, so to
 check it headlessly, capture frames over the DevTools protocol at a few moments
@@ -79,7 +80,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-484 tests, a couple of seconds, no network and no Plex server. They never touch
+485 tests, a couple of seconds, no network and no Plex server. They never touch
 your real `proxy/config.json`. See [TESTING.md](TESTING.md) for what is covered
 and how to add to it.
 
