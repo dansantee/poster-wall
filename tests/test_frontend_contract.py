@@ -1184,10 +1184,10 @@ def test_a_failed_or_stalled_transition_cleans_up_and_frees_the_poll_loop(source
 def test_fun_fact_bubbles_pop_over_the_art_on_the_agreed_clock(source):
     """Dan approved the Pop-Up Video style bubbles on the TV (2026-09-26): classic pop, first at
     15 s, one per 30-40 s, each held for its reading time, none in a song's last 15 s or during
-    a song change; a song without facts just has none."""
+    a song change; a song without facts just has none. 2026-10-07: the first moved to 25 s."""
     app_js = source(APP_JS)
     popup = app_js[app_js.index("// ---- fun-fact bubbles"):app_js.index("// Centre the pause badge")]
-    assert "let popupTiming = { first: 15000, every: 35000 };" in popup
+    assert "let popupTiming = { first: 25000, every: 35000 };" in popup
     assert "const POPUP_END_QUIET_MS = 15000;" in popup
     # Dan: a little more time; capped so a long fact still fits its 35 s slot (Astra).
     assert "return Math.min(POPUP_MAX_READ_MS, 3000 + String(text).length / 12 * 1000);" in popup

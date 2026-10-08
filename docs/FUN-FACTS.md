@@ -21,7 +21,7 @@ is needed: there is no setting to turn on and no file on the Pi.
 
 ## Timing
 
-The first bubble comes 15 s in. After that they are at least 35 s apart, and on a
+The first bubble comes 25 s in. After that they are at least 35 s apart, and on a
 long song they spread out so the facts run until near the end. Each fact shows
 up to twice, and nothing starts in a song's last 15 s.
 

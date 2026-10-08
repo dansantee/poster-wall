@@ -1279,7 +1279,7 @@
 
   // ---- fun-fact bubbles (music layout, Pop-Up Video style) ----
   // data.facts (short strings; none means no bubbles) pop up over a corner of the art: the
-  // first 15 s in, then one per slot (35 s, longer on a long song), each held for its reading
+  // first 25 s in, then one per slot (35 s, longer on a long song), each held for its reading
   // time. It runs off the playback position, so a pause holds the bubble and a seek picks the
   // matching slot; nothing starts in a song's last 15 s or during a song change.
   const POPUP_END_QUIET_MS = 15000;
@@ -1292,7 +1292,8 @@
   // The slots cycle through the facts: each shows up to this many times, a slow steady stream
   // for anyone who missed one (Dan: "all the facts should repeat maybe once").
   const POPUP_REPEATS = 2;
-  let popupTiming = { first: 15000, every: 35000 };  // ?demo=popup shortens these
+  // The first waits 25 s, past most intros (Dan, 2026-10-07: "a little farther in").
+  let popupTiming = { first: 25000, every: 35000 };  // ?demo=popup shortens these
   let popupFacts = [];
   let popupSlot = -1;          // the slot on screen, or -1
   let popupShown = new Set();  // slots already shown for this item: each fact shows once
