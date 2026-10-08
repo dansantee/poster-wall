@@ -21,9 +21,10 @@ is needed: there is no setting to turn on and no file on the Pi.
 
 ## Timing
 
-The first bubble comes 25 s in. After that they are at least 35 s apart, and on a
-long song they spread out so the facts run until near the end. Each fact shows
-up to twice, and nothing starts in a song's last 15 s.
+The first bubble comes 25 s in. After that they are usually 35 s apart. On a
+long song they spread out so the facts run until near the end. On a short song
+they close up, to as little as 20 s apart, so that every fact still gets a turn.
+Each fact shows up to twice, and nothing starts in a song's last 15 s.
 
 Each bubble stays up for 3 s plus about 12 characters a second, at most 20 s.
 Three to five facts is a good number for a typical song.

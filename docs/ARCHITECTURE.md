@@ -375,10 +375,17 @@ Two things about `nowplaying` mode are worth knowing:
     characters a second).
     - The slots cycle through the facts, and each fact shows up to twice
       (`POPUP_REPEATS`), a slow stream for anyone who missed one.
-    - A slot is 35 s at least. On a long song `popupEvery()` stretches the
+    - A slot is normally 35 s. On a long song `popupEvery()` stretches the
       slots so they fill the song up to its quiet end instead of bunching at
       the front (2026-10-07: Father Figure and Thriller had nothing in their
       last minutes). A 6:40 song with four facts gets one about every 45 s.
+    - A short song does the opposite: when 35 s slots can't fit every fact
+      once (the last needing only its own reading time), `popupEvery()`
+      squeezes them until they do, and the repeats are what's dropped
+      (2026-10-07: Foil, 2:32, showed three of its five facts). A slot never
+      goes below 20 s (`POPUP_MIN_EVERY_MS`), or below the longest fact's
+      reading time plus a second, so every bubble still finishes in its slot. A song of about 2 minutes
+      or less with four or five facts can still miss one.
     - `updatePopup()` runs on the progress tick from the playback position, so
       a pause holds a bubble and a seek picks that slot's fact. Only a jump
       back of more than 3 s counts as a seek, since each Plex report

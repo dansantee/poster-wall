@@ -593,13 +593,13 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     per slot updatePopup() would fill: from `first` every `every`, up to POPUP_REPEATS rounds of
     the facts, while the bubble can finish before the song's quiet end."""
     names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
-             "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes"]
+             "POPUP_MIN_EVERY_MS", "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes"]
     t = "{first: 15000, every: 35000}"
     twenty = "'" + "x" * 204 + "'"   # popupReadMs = 3 s + 204/12 s = 20 s
     out = _run_js(source, names, [
         f"factMarkTimes(240000, ['a', 'b', 'c'], {t})",          # 6 slots, all fit
         f"factMarkTimes(240000, ['a', 'b', 'c', 'd'], {t})",     # the 7th (225 s) runs into the quiet end
-        f"factMarkTimes(60000, ['a', 'b'], {t})",                # a short song: only the first
+        f"factMarkTimes(60000, ['a', 'b'], {t})",                # a short song: squeezed so both fit
         f"factMarkTimes(240000, [], {t})",
         f"factMarkTimes(0, ['a'], {t})",
         f"factMarkTimes(25000, ['a'], {t})",                     # too short for even one
@@ -611,7 +611,7 @@ def test_fact_marks_sit_where_the_bubbles_will_pop_up(source):
     assert out[7] == 20000
     assert out[:7] == [[15000, 50000, 85000, 120000, 155000, 190000],
                        [15000, 50000, 85000, 120000, 155000, 190000],
-                       [15000], [], [], [],
+                       [15000, 40916], [], [], [],
                        [15000, 50000]]
     app_js = source(APP_JS)
     assert re.search(r"function renderProgress\(\) \{(?:(?!\n  \}\n).)*renderFactMarks\(\);", app_js, re.S)
@@ -631,7 +631,7 @@ def test_a_long_song_spreads_its_fact_bubbles_to_the_end(source):
     end had nothing. Slots stay at least `every` apart but stretch to fill a long song up to its
     quiet end; the marks and updatePopup() use the same slots."""
     names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
-             "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes", "updatePopup"]
+             "POPUP_MIN_EVERY_MS", "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes", "updatePopup"]
     prelude = """
 let playback, popupFacts, popupTiming, popupSlot, popupShown, popupShownAt, popupHideAt, posNow;
 let popupNotBefore = 0, trackAnimating = false;
@@ -661,6 +661,66 @@ function slotAt(duration, pos) {
     assert out[1] == [15000, 113750, 212500, 311250, 410000, 508750, 607500, 706250]
     assert out[2] == [15000, 50000, 85000, 120000, 155000, 190000]
     assert out[3:] == [6, 7, 1]
+
+
+@needs_node
+def test_a_short_song_squeezes_its_slots_so_every_fact_shows(source):
+    """Dan, 2026-10-07: Foil (2:32) has five facts but showed three, since only three 35 s slots
+    fit after the first at 25 s. A short song squeezes the slots, down to 20 s, until every fact
+    fits once; the repeats are what's dropped. The marks and updatePopup() share the slots.
+    Astra pass 1: a song whose first round already fits at 35 s isn't squeezed (#2), and a slot
+    never gets too short for its longest fact to finish, so every mark gets its bubble (#1)."""
+    names = ["POPUP_END_QUIET_MS", "POPUP_MAX_READ_MS", "POPUP_REPEATS", "popupReadMs",
+             "POPUP_MIN_EVERY_MS", "popupEvery", "FACT_MARK_SLACK_MS", "factMarkTimes",
+             "POPUP_SEEK_BACK_MS", "updatePopup"]
+    prelude = """
+let playback, popupFacts, popupTiming, popupSlot, popupShown, popupShownAt, popupHideAt, posNow;
+let popupNotBefore = 0, trackAnimating = false;
+function positionMs() { return posNow; }
+function popInPopup(slot) { popupSlot = slot; popupShown.add(slot); }
+function popOutPopup() { popupSlot = -1; }
+"""
+    setup = """
+const t = {first: 25000, every: 35000};
+const five = ['a', 'b', 'c', 'd', 'e'].map(c => c.repeat(100));  // 100 characters: 11.3 s each
+const longest = ['a', 'b', 'c', 'd', 'e'].map(c => c.repeat(204));  // 20 s each, the cap
+function slotAt(duration, pos) {
+  playback = {duration}; popupFacts = five; popupTiming = t;
+  popupSlot = -1; popupShown = new Set(); posNow = pos;
+  updatePopup();
+  return popupSlot;
+}
+// Plays a song through on 250 ms ticks that never land on a slot's opening; the slots that popped.
+function play(duration, facts) {
+  playback = {duration}; popupFacts = facts; popupTiming = t;
+  popupSlot = -1; popupShown = new Set();
+  for (posNow = 100; posNow < duration; posNow += 250) updatePopup();
+  return [...popupShown];
+}
+"""
+    out = _run_js(source, names, [
+        "factMarkTimes(151800, five, t)",   # Foil: the last 12.3 s bubble ends right at the quiet end
+        "play(151800, five)",
+        "factMarkTimes(120000, five, t)",   # 2:00: floored at 20 s, so four of the five fit
+        "factMarkTimes(240000, five, t)",   # room for all five at 35 s: unchanged
+        "factMarkTimes(200000, five, t)",   # #2: the first round fits at 35 s, so no squeeze
+        # pass 2: only the last fact's bubble needs room at the end; 174 s with slack, before 175 s
+        "factMarkTimes(190000, [110, 100, 90, 80, 60].map(n => 'x'.repeat(n)), t)",
+        "factMarkTimes(120000, longest, t)",   # #1: 21 s slots, room for a 20 s bubble and a tick
+        "play(120000, longest)",
+        "slotAt(151800, 125000)",           # the fifth fact, in the slot opening at 124.46 s
+        "popupEvery(30000, ['a', 'b', 'c', 'd'], {first: 3000, every: 12000})",  # demo: stays 12 s
+    ], prelude=prelude, setup=setup)
+    assert out[0] == [25000, 49866, 74732, 99598, 124464]
+    assert out[1] == [0, 1, 2, 3, 4]
+    assert out[2] == [25000, 45000, 65000, 85000]
+    assert out[3] == [25000, 60000, 95000, 130000, 165000, 200000]
+    assert out[4] == [25000, 60000, 95000, 130000, 165000]
+    assert out[5] == [25000, 60000, 95000, 130000, 165000]
+    assert out[6] == [25000, 46000, 67000]
+    assert out[7] == [0, 1, 2]
+    assert out[8] == 4
+    assert out[9] == 12000
 
 
 @needs_node
