@@ -915,6 +915,9 @@
 
   function setScrollingText(el, text) {
     if (!el) return;
+    // Stop the old title's endless scroll first: it kept running on its detached span, and two
+    // weeks of songs piled up enough of them to peg the Pi's renderer (2026-10-22).
+    el.querySelectorAll('.now-showing-scroll').forEach(old => old.getAnimations().forEach(a => a.cancel()));
     el.classList.remove('scrolling');
     el.textContent = '';
     const span = document.createElement('span');

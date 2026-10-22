@@ -1126,6 +1126,31 @@ def test_song_and_artist_stay_on_one_line_and_scroll_when_too_long(source):
     assert "iterations: Infinity" in body
 
 
+@needs_node
+def test_a_new_title_stops_the_old_titles_endless_scroll(source):
+    """2026-10-22: after 14 days up, the Pi's renderer had its main and compositor threads
+    pegged and every animation lagged. Each long title's infinite scroll kept running on its
+    span after the next song replaced it, so they piled up song after song."""
+    prelude = """
+    const running = [];
+    const document = { createElement: () => ({
+      anims: [], parentNode: null, className: '', textContent: '', scrollWidth: 1000,
+      getAnimations() { return this.anims.filter(a => a.playState === 'running'); },
+      animate() { const a = { playState: 'running', cancel() { this.playState = 'idle'; } };
+                  this.anims.push(a); running.push(a); return a; } }) };
+    const requestAnimationFrame = cb => cb();
+    const line = { children: [], clientWidth: 300, classList: { add() {}, remove() {} },
+      set textContent(v) { this.children.forEach(c => { c.parentNode = null; }); this.children = []; },
+      appendChild(c) { c.parentNode = this; this.children.push(c); },
+      querySelectorAll(sel) { return this.children.filter(c => '.' + c.className === sel); } };
+    """
+    setup = "['Song one', 'Song two', 'Song three'].forEach(t => setScrollingText(line, t));"
+    out = _run_js(source, ["SCROLL_PX_PER_SECOND", "SCROLL_PAUSE_MS", "setScrollingText"],
+                  ["running.length", "running.filter(a => a.playState === 'running').length"],
+                  prelude=prelude, setup=setup)
+    assert out == [3, 1], "only the title on screen may still be scrolling"
+
+
 def test_up_next_titles_wrap_evenly_and_keep_the_row_aligned(source):
     """On the 4K wall "This Is What You Came / For" left one word alone, and one-line titles
     left the artist lines at different heights across the row."""
