@@ -224,6 +224,21 @@ transform and `fbcon` rotation both come from that one flag.
 `current_mode`). At 4K, at 30 or 60 Hz, pin 1080p60 with `./setup.sh --rotate 90
 --mode 1920x1080@60Hz` (see the `--mode` notes above).
 
+**Animations get laggy after the kiosk has been up for days.** Animations that are
+smooth after a restart but lag days later point to something accumulating in the
+page. Check the renderer's threads:
+
+```bash
+ps -o pid,etime,pcpu,args --sort=-pcpu -u $USER | grep -- '--type=renderer' | head -1
+top -H -bn1 -p <renderer pid> | head -15
+```
+
+A healthy kiosk's main (`chromium`) and `Compositor` threads sit at a few percent.
+If they sit near 100% with nothing animating, the page is servicing work it no
+longer shows. The known case was leaked title-scroll animations, fixed in
+`2b481f3`. Restarting the kiosk clears it for now; then look for a
+Web Animation or timer that outlives its element.
+
 **Confirming which code is live.** `GET /api/build-info`, or the Build Status
 panel. `dirty: true` means files on the Pi differ from its commit — normally the
 signature of a direct deploy.

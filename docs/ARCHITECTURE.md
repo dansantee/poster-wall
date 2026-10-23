@@ -306,7 +306,10 @@ Two things about `nowplaying` mode are worth knowing:
     line's own font explicitly (`document.fonts.load`) and measures again once
     that font is ready, because Montserrat is wider than its fallback and only
     starts loading once music text is on screen. Wrapping to a second line used to push the rest of the layout
-    down.
+    down. Each new title first cancels the old span's animation: an infinite
+    animation keeps running on a span after it leaves the page, and before that
+    fix two weeks of songs piled up enough of them to peg the renderer and make
+    every animation lag.
   - Below that, **"Up next"** (label in the accent colour): up to three
     upcoming items from `upNext` as covers in square tiles with song and artist, drawn
     by `renderUpNext()`, which HTML-escapes every title.
