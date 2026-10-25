@@ -233,9 +233,9 @@ ps -o pid,etime,pcpu,args --sort=-pcpu -u $USER | grep -- '--type=renderer' | he
 top -H -bn1 -p <renderer pid> | head -15
 ```
 
-A healthy kiosk's main (`chromium`) and `Compositor` threads sit at a few percent.
-If they sit near 100% with nothing animating, the page is servicing work it no
-longer shows. The known case was leaked title-scroll animations, fixed in
+A freshly restarted kiosk playing a music video measured about 20% on the main
+(`chromium`) thread and 7% on `Compositor`. If both sit near 100%, the page is
+servicing work it no longer shows. The known case was leaked title-scroll animations, fixed in
 `2b481f3`. Restarting the kiosk clears it for now; then look for a
 Web Animation or timer that outlives its element.
 
