@@ -341,7 +341,7 @@ def test_the_installer_parses(repo_root):
     assert r.returncode == 0, r.stderr
 
 
-@pytest.mark.parametrize("path", [INSTALL_SH, SETUP_SH])
+@pytest.mark.parametrize("path", [INSTALL_SH, SETUP_SH, "scripts/pin-display.sh"])
 def test_the_scripts_are_executable_in_git(repo_root, path):
     try:
         r = subprocess.run(["git", "-C", str(repo_root), "ls-files", "-s", path],

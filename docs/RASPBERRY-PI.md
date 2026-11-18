@@ -53,6 +53,21 @@ Run from the repo root, idempotent, safe to re-run:
 6. **Applies boot tweaks** to `/boot/firmware`, backing up each file first:
    `consoleblank=0` (no blanking), `gpu_mem=256`, `hdmi_force_hotplug=1`, and
    exactly one `fbcon=rotate:N` entry.
+7. **Pins the display** with `scripts/pin-display.sh`, so the kiosk boots even with
+   the TV off. The Pi 5's KMS driver ignores `hdmi_force_hotplug`. With the TV off
+   at boot, the wall once came up on the tty1 login prompt instead of the kiosk
+   (2026-11-17). The script:
+   - saves the TV's EDID to `/usr/lib/firmware/edid/poster-wall-HDMI-A-1.bin`;
+   - adds it to the initramfs through the hook `/etc/initramfs-tools/hooks/poster-wall-edid`,
+     because `vc4` loads from the initramfs;
+   - adds `drm.edid_firmware=HDMI-A-1:edid/poster-wall-HDMI-A-1.bin video=HDMI-A-1:D`
+     to `cmdline.txt` (a mode already pinned there with `video=` is kept);
+   - masks `getty@tty1` and `autovt@tty1`.
+
+   Run it with the TV on the first time. With the TV off and nothing saved yet, it
+   only warns. A later run with the TV off keeps the pin. It can be run on its own
+   (`bash scripts/pin-display.sh`). To pin a different TV, run
+   `scripts/pin-display.sh --unpin`, reboot, then run it again with the new TV on.
 
 `--rotate` accepts `0`, `90`, `180` or `270` and drives both the Sway output
 transform (degrees) and the framebuffer console rotation (`degrees / 90`). To
@@ -181,6 +196,11 @@ behaviour instead. Finish by pushing and doing a repo deploy to realign.
 ```
 
 ## Troubleshooting
+
+**Login prompt on the TV after a reboot.** The display wasn't pinned (step 7 of
+`setup.sh`). Restart the kiosk to get the wall back, then, with the TV on, run
+`bash scripts/pin-display.sh` and reboot. Check that `cmdline.txt` has the
+`drm.edid_firmware=` and `video=HDMI-A-1:D` entries.
 
 **Black screen, no posters.** Check the kiosk unit and its journal:
 

@@ -507,6 +507,7 @@ web/styles.css       everything visual, including all transition keyframes
 web/fonts/          League Spartan (OFL) for the badges; Bebas Neue (OFL), the marquee default
 setup.sh             one-shot Pi provisioning; safe to re-run
 scripts/…-remote.ps1 Windows-side deploy/restart helper over SSH
+scripts/pin-display.sh pins the TV's EDID so the kiosk boots with the TV off
 docs/                this documentation
 tests/               pytest suite (see TESTING.md)
 ```

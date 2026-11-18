@@ -5,6 +5,7 @@
 # - Creates user systemd services (proxy, web, kiosk)
 # - Enables seatd for GPU/DRM access, adds user to required groups
 # - Applies safe boot tweaks (no screen blanking, GPU mem, fbcon rotation)
+# - Pins the TV's EDID so the kiosk boots even with the TV off (scripts/pin-display.sh)
 # - Starts services immediately and enables at boot
 #
 # Usage (from repo root containing ./proxy and ./web):
@@ -292,6 +293,10 @@ if [[ -e "$CMDLINE" && -e "$CONFIGTXT" ]]; then
     | tr -s ' ' \
     | sed 's/[[:space:]]$//')"
   printf '%s %s\n' "$cleaned" "$desired" | sudo tee "$CMDLINE" >/dev/null
+
+  # --- Boot with the TV off: pin its EDID, keep the login prompt off the screen ---
+  echo "==> Pinning the display so the kiosk doesn't need the TV on at boot..."
+  bash "$REPO_DIR/scripts/pin-display.sh"
 
 else
   echo "WARN: Cannot find $CMDLINE or $CONFIGTXT. Skipping boot tweaks."
